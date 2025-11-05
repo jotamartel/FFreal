@@ -205,6 +205,68 @@ export async function updateUser(
 }
 
 /**
+ * Get user by Shopify customer ID
+ */
+export async function getUserByShopifyCustomerId(shopifyCustomerId: string): Promise<User | null> {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at
+       FROM users
+       WHERE shopify_customer_id = $1`,
+      [shopifyCustomerId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0] as User;
+  } catch (error) {
+    console.error('Error getting user by Shopify customer ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Find or create user by Shopify customer ID
+ * This is useful for Customer Account Extensions where we only have the Shopify customer ID
+ */
+export async function findOrCreateUserByShopifyCustomerId(
+  shopifyCustomerId: string,
+  email?: string
+): Promise<User | null> {
+  try {
+    // First, try to find existing user
+    let user = await getUserByShopifyCustomerId(shopifyCustomerId);
+    
+    if (user) {
+      return user;
+    }
+
+    // If not found and we have email, try to find by email and link the Shopify customer ID
+    if (email) {
+      const userByEmail = await getUserByEmail(email);
+      if (userByEmail) {
+        // Update the user with Shopify customer ID
+        await pool.query(
+          `UPDATE users SET shopify_customer_id = $1, updated_at = NOW() WHERE id = $2`,
+          [shopifyCustomerId, userByEmail.id]
+        );
+        return { ...userByEmail, shopify_customer_id: shopifyCustomerId };
+      }
+    }
+
+    // If still not found, we can't create a user without email/password
+    // This should be handled by the registration flow
+    console.warn(`[findOrCreateUserByShopifyCustomerId] User not found for Shopify customer ID: ${shopifyCustomerId}`);
+    return null;
+  } catch (error) {
+    console.error('Error finding or creating user by Shopify customer ID:', error);
+    return null;
+  }
+}
+
+/**
  * Check if email exists
  */
 export async function emailExists(email: string): Promise<boolean> {
