@@ -289,9 +289,7 @@ export default function GroupDetailPage() {
               
               {group.current_members !== members.length && (
                 <Banner tone="attention">
-                  <Text as="p">
-                    Member count mismatch: Database shows {group.current_members} but there are {members.length} active members. Click "Sync Count" to fix.
-                  </Text>
+                  Member count mismatch: Database shows {group.current_members} but there are {members.length} active members. Click "Sync Count" to fix.
                 </Banner>
               )}
 
