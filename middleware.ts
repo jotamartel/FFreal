@@ -4,8 +4,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Configurar runtime para Node.js (necesario para jsonwebtoken)
-export const runtime = 'nodejs';
+// No necesitamos configurar runtime - jose funciona en Edge Runtime
 
 // Importar verifyToken después de configurar runtime
 import { verifyToken } from './lib/auth/session';
@@ -19,7 +18,7 @@ const publicRoutes = ['/tienda', '/login'];
 // Routes that should redirect to /customer if already authenticated
 const authRoutes = ['/login'];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Get token from cookies
@@ -35,7 +34,7 @@ export function middleware(request: NextRequest) {
   
   let isAuthenticated = false;
   if (token) {
-    const verified = verifyToken(token);
+    const verified = await verifyToken(token);
     isAuthenticated = verified !== null;
     if (!isAuthenticated) {
       console.log('[Middleware] Token inválido o expirado');

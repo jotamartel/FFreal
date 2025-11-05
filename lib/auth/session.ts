@@ -1,6 +1,6 @@
-// Session management using JWT
+// Session management using JWT with jose (Edge Runtime compatible)
 
-import jwt from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
@@ -12,17 +12,33 @@ export interface SessionPayload {
   role?: string;
 }
 
+// Convert secret string to Uint8Array for jose
+function getSecretKey(): Uint8Array {
+  const encoder = new TextEncoder();
+  return encoder.encode(JWT_SECRET);
+}
+
 /**
- * Create a JWT token
+ * Create a JWT token (Edge Runtime compatible)
  */
-export function createToken(payload: SessionPayload): string {
+export async function createToken(payload: SessionPayload): Promise<string> {
   if (!JWT_SECRET || JWT_SECRET === 'fallback-secret-change-in-production') {
     console.error('[createToken] ⚠️ SESSION_SECRET no está configurado o usa el valor por defecto');
   }
   
-  const token = jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+  const secretKey = getSecretKey();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+  
+  const token = await new SignJWT({
+    userId: payload.userId,
+    email: payload.email,
+    role: payload.role || 'customer',
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresAt)
+    .sign(secretKey);
   
   if (process.env.DEBUG_DB === 'true') {
     console.log('[createToken] Token creado:', {
@@ -37,9 +53,9 @@ export function createToken(payload: SessionPayload): string {
 }
 
 /**
- * Verify and decode a JWT token
+ * Verify and decode a JWT token (Edge Runtime compatible)
  */
-export function verifyToken(token: string): SessionPayload | null {
+export async function verifyToken(token: string): Promise<SessionPayload | null> {
   try {
     // Siempre log para debugging en producción
     console.log('[verifyToken] Iniciando verificación:', {
@@ -54,15 +70,22 @@ export function verifyToken(token: string): SessionPayload | null {
       console.error('[verifyToken] ⚠️ SESSION_SECRET no está configurado o usa el valor por defecto');
     }
     
-    const decoded = jwt.verify(token, JWT_SECRET) as SessionPayload;
+    const secretKey = getSecretKey();
+    const { payload: decoded } = await jwtVerify(token, secretKey);
+    
+    const sessionPayload: SessionPayload = {
+      userId: decoded.userId as string,
+      email: decoded.email as string,
+      role: decoded.role as string,
+    };
     
     console.log('[verifyToken] ✅ Token válido:', {
-      userId: decoded.userId,
-      email: decoded.email,
-      role: decoded.role,
+      userId: sessionPayload.userId,
+      email: sessionPayload.email,
+      role: sessionPayload.role,
     });
     
-    return decoded;
+    return sessionPayload;
   } catch (error: any) {
     // Log el error específico para debugging
     console.error('[verifyToken] ❌ Error verificando token:', {
@@ -88,14 +111,14 @@ export async function getSession(): Promise<SessionPayload | null> {
     return null;
   }
 
-  return verifyToken(token);
+  return await verifyToken(token);
 }
 
 /**
  * Set session cookie
  */
 export async function setSession(payload: SessionPayload): Promise<void> {
-  const token = createToken(payload);
+  const token = await createToken(payload);
   const cookieStore = await cookies();
   
   // En producción, usar secure siempre que sea HTTPS
@@ -131,8 +154,8 @@ export async function clearSession(): Promise<void> {
 /**
  * Get user ID from session (client-side helper)
  */
-export function getUserIdFromToken(token: string): string | null {
-  const payload = verifyToken(token);
+export async function getUserIdFromToken(token: string): Promise<string | null> {
+  const payload = await verifyToken(token);
   return payload?.userId || null;
 }
 

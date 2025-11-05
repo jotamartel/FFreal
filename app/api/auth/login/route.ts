@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     console.log('[LOGIN] ✅ Usuario autenticado:', { id: user.id, email: user.email });
 
     // Create session token
-    const token = createToken({
+    const token = await createToken({
       userId: user.id,
       email: user.email,
       role: user.role,
