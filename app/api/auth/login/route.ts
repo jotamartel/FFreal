@@ -55,17 +55,24 @@ export async function POST(request: NextRequest) {
     });
 
     // Set cookie directly in response headers for immediate availability
-    response.cookies.set('auth-token', token, {
+    // IMPORTANTE: Usar las mismas opciones que el navegador espera
+    const cookieOptions = {
       httpOnly: true,
       secure: isSecure,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
-    });
+    };
+    
+    response.cookies.set('auth-token', token, cookieOptions);
 
     console.log('[LOGIN] Cookie establecida en respuesta:', { 
-      hasToken: !!token, 
-      secure: isSecure 
+      hasToken: !!token,
+      tokenLength: token.length,
+      secure: isSecure,
+      options: cookieOptions,
+      // Verificar que la cookie está en los headers
+      setCookieHeader: response.headers.get('Set-Cookie'),
     });
 
     return response;

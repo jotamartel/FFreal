@@ -62,15 +62,17 @@ export default function LoginPage() {
         return;
       }
 
-      // Success - redirect to redirect param or default
-      // Use window.location.href with full reload to ensure cookie is available
+      // Success - the cookie is set in the response headers
+      // Wait a moment for the cookie to be processed by the browser
+      // Then do a full page reload to the redirect destination
       const redirect = new URLSearchParams(window.location.search).get('redirect') || '/customer';
       
-      // Force a full page reload to ensure cookie is set and middleware can read it
-      // Using setTimeout to ensure the response is fully processed
+      // Use a longer delay and ensure we're doing a full navigation
+      // This gives the browser time to process the Set-Cookie header
       setTimeout(() => {
-        window.location.href = redirect;
-      }, 200);
+        // Force a full page navigation to ensure cookie is available
+        window.location.replace(redirect);
+      }, 300);
     } catch (error) {
       console.error('Login error:', error);
       setError('An unexpected error occurred');

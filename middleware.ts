@@ -19,16 +19,24 @@ export function middleware(request: NextRequest) {
   // Get token from cookies
   const token = request.cookies.get('auth-token')?.value;
   
-  // Log for debugging (only in development)
-  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DB === 'true') {
-    console.log('[Middleware]', {
-      pathname,
-      hasToken: !!token,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
-    });
-  }
+  // Log for debugging (always log in production to diagnose issues)
+  console.log('[Middleware]', {
+    pathname,
+    hasToken: !!token,
+    tokenLength: token?.length || 0,
+    allCookies: request.cookies.getAll().map(c => c.name),
+  });
   
-  const isAuthenticated = token ? verifyToken(token) !== null : false;
+  let isAuthenticated = false;
+  if (token) {
+    const verified = verifyToken(token);
+    isAuthenticated = verified !== null;
+    if (!isAuthenticated) {
+      console.log('[Middleware] Token inválido o expirado');
+    }
+  } else {
+    console.log('[Middleware] No se encontró token en cookies');
+  }
 
   // Check if route is protected
   const isProtectedRoute = protectedRoutes.some(route => 
