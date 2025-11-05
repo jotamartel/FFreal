@@ -16,21 +16,26 @@ const isSupabase =
   process.env.SUPABASE_URL ||
   process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-// Configurar SSL para Supabase/Vercel Postgres
-// Supabase requiere SSL pero con configuración específica para certificados auto-firmados
-// En producción, siempre usar SSL para Supabase
-const sslConfig = isSupabase || connectionString?.includes('sslmode=require')
-  ? {
-      rejectUnauthorized: false,
-      // Permitir certificados auto-firmados de Supabase
-      checkServerIdentity: () => undefined,
-    }
-  : connectionString && !connectionString.includes('localhost')
-  ? {
-      rejectUnauthorized: false,
-      checkServerIdentity: () => undefined,
-    }
-  : false;
+// IMPORTANTE: Para Supabase, siempre necesitamos SSL con certificados auto-firmados
+// El connection string puede tener ?sslmode=require, pero necesitamos configurar SSL explícitamente
+// Eliminar sslmode del connection string y configurarlo manualmente
+let cleanConnectionString = connectionString || '';
+// Remover todos los parámetros sslmode del connection string
+cleanConnectionString = cleanConnectionString.replace(/\?sslmode=[^&]*/i, '');
+cleanConnectionString = cleanConnectionString.replace(/&sslmode=[^&]*/i, '');
+cleanConnectionString = cleanConnectionString.replace(/\?sslmode=[^\s]*/i, '');
+
+// Configurar SSL para Supabase - SIEMPRE requerido con certificados auto-firmados
+// En producción, si es Supabase o tiene sslmode=require, usar SSL con configuración permisiva
+const needsSSL = isSupabase || 
+  (connectionString?.includes('sslmode=require')) ||
+  (connectionString && !connectionString.includes('localhost'));
+
+const sslConfig = needsSSL ? {
+  rejectUnauthorized: false,
+  // Crítico: deshabilitar verificación de identidad del servidor para certificados auto-firmados
+  checkServerIdentity: () => undefined,
+} : false;
 
 // Log de configuración SSL (solo en desarrollo o cuando hay error)
 if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DB === 'true') {
@@ -46,8 +51,12 @@ if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DB === 'true') {
 }
 
 export const pool = new Pool({
-  connectionString,
+  connectionString: cleanConnectionString,
   ssl: sslConfig,
+  // Configuración adicional para evitar problemas de conexión
+  max: 10, // máximo de conexiones en el pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Manejar errores de conexión
