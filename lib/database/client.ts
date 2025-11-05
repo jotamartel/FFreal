@@ -32,9 +32,33 @@ const sslConfig = isSupabase || connectionString?.includes('sslmode=require')
     }
   : false;
 
+// Log de configuración SSL (solo en desarrollo o cuando hay error)
+if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DB === 'true') {
+  console.log('[DB Client] Configuración:', {
+    hasConnectionString: !!connectionString,
+    isSupabase,
+    hasSSL: !!sslConfig,
+    sslConfig: sslConfig ? {
+      rejectUnauthorized: sslConfig.rejectUnauthorized,
+      hasCheckServerIdentity: !!sslConfig.checkServerIdentity,
+    } : false,
+  });
+}
+
 export const pool = new Pool({
   connectionString,
   ssl: sslConfig,
+});
+
+// Manejar errores de conexión
+pool.on('error', (err, client) => {
+  console.error('[DB Client] Error inesperado en pool de conexiones:', err);
+});
+
+pool.on('connect', (client) => {
+  if (process.env.DEBUG_DB === 'true') {
+    console.log('[DB Client] Nueva conexión establecida');
+  }
 });
 
 // Test connection
