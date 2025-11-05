@@ -245,6 +245,11 @@ export default function TiendaPage() {
                 >
                   Crear Nuevo Grupo
                 </Button>
+                <Button
+                  onClick={() => router.push('/tienda/unirse')}
+                >
+                  Unirse a un Grupo
+                </Button>
               </InlineStack>
             </BlockStack>
           </Card>
