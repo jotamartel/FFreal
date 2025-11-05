@@ -37,6 +37,21 @@ export async function createGroup(
   try {
     const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6, ownerUserId } = params;
     
+    // Verificar qué columnas existen
+    const groupsColumns = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ff_groups' AND column_name IN ('owner_user_id')
+    `);
+    const hasOwnerUserId = groupsColumns.rows.length > 0;
+    
+    const membersColumns = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ff_group_members' AND column_name IN ('user_id')
+    `);
+    const hasMemberUserId = membersColumns.rows.length > 0;
+    
     // Generar código único
     let inviteCode = generateInviteCode();
     let attempts = 0;
@@ -50,23 +65,45 @@ export async function createGroup(
       attempts++;
     }
 
+    // Construir query INSERT dinámicamente basado en columnas disponibles
+    let insertColumns = ['merchant_id', 'name', 'owner_customer_id', 'owner_email', 'invite_code', 'max_members', 'current_members'];
+    let insertValues: any[] = [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers, 1];
+    
+    if (hasOwnerUserId && ownerUserId) {
+      insertColumns.push('owner_user_id');
+      insertValues.push(ownerUserId);
+    }
+    
+    const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
+    const columnsStr = insertColumns.join(', ');
+    
     const result = await pool.query(
-      `INSERT INTO ff_groups 
-       (merchant_id, name, owner_customer_id, owner_email, owner_user_id, invite_code, max_members, current_members)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+      `INSERT INTO ff_groups (${columnsStr})
+       VALUES (${placeholders})
        RETURNING *`,
-      [merchantId, name, ownerCustomerId, ownerEmail, ownerUserId || null, inviteCode, maxMembers]
+      insertValues
     );
 
     const group = result.rows[0] as FFGroup;
 
-    // Crear el owner como miembro activo (con user_id si está disponible)
-    await pool.query(
-      `INSERT INTO ff_group_members 
-       (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
-       VALUES ($1, $2, $3, $4, 'owner', 'active', true, NOW())`,
-      [group.id, ownerCustomerId, ownerUserId || null, ownerEmail]
-    );
+    // Crear el owner como miembro activo
+    if (hasMemberUserId && ownerUserId) {
+      // Con user_id disponible
+      await pool.query(
+        `INSERT INTO ff_group_members 
+         (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
+         VALUES ($1, $2, $3, $4, 'owner', 'active', true, NOW())`,
+        [group.id, ownerCustomerId, ownerUserId, ownerEmail]
+      );
+    } else {
+      // Sin user_id (columna no existe o no disponible)
+      await pool.query(
+        `INSERT INTO ff_group_members 
+         (group_id, customer_id, email, role, status, email_verified, joined_at)
+         VALUES ($1, $2, $3, 'owner', 'active', true, NOW())`,
+        [group.id, ownerCustomerId, ownerEmail]
+      );
+    }
 
     return group;
   } catch (error) {
