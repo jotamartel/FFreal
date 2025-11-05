@@ -1,7 +1,13 @@
 // Middleware to protect routes and handle authentication
+// IMPORTANTE: Este middleware debe ejecutarse en Node.js runtime, no Edge Runtime
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+
+// Configurar runtime para Node.js (necesario para jsonwebtoken)
+export const runtime = 'nodejs';
+
+// Importar verifyToken después de configurar runtime
 import { verifyToken } from './lib/auth/session';
 
 // Routes that require authentication
