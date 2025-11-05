@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { acceptInvitation } from '@/lib/database/ff-groups';
+import { getSession } from '@/lib/auth/session';
 
 /**
  * POST /api/invitations/[token]/accept - Accept an invitation
@@ -14,7 +15,11 @@ export async function POST(
     const body = await request.json();
     const { customerId } = body;
 
-    const member = await acceptInvitation(params.token, customerId);
+    // Get user from session if authenticated (optional - invitations can be accepted without login)
+    const session = await getSession();
+    const userId = session?.userId;
+
+    const member = await acceptInvitation(params.token, customerId, userId);
 
     if (!member) {
       return NextResponse.json(
@@ -23,7 +28,12 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ member }, { status: 200 });
+    return NextResponse.json({ 
+      member,
+      authenticated: !!session,
+      // If authenticated, return session info for auto-login on frontend
+      ...(session && { userId: session.userId })
+    }, { status: 200 });
   } catch (error) {
     console.error('Error accepting invitation:', error);
     return NextResponse.json(

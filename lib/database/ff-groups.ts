@@ -32,10 +32,10 @@ function generateVerificationToken(): string {
  * Crear un nuevo grupo Friends & Family
  */
 export async function createGroup(
-  params: CreateGroupParams
+  params: CreateGroupParams & { ownerUserId?: string }
 ): Promise<FFGroup | null> {
   try {
-    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6 } = params;
+    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6, ownerUserId } = params;
     
     // Generar código único
     let inviteCode = generateInviteCode();
@@ -52,20 +52,20 @@ export async function createGroup(
 
     const result = await pool.query(
       `INSERT INTO ff_groups 
-       (merchant_id, name, owner_customer_id, owner_email, invite_code, max_members, current_members)
-       VALUES ($1, $2, $3, $4, $5, $6, 1)
+       (merchant_id, name, owner_customer_id, owner_email, owner_user_id, invite_code, max_members, current_members)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
        RETURNING *`,
-      [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers]
+      [merchantId, name, ownerCustomerId, ownerEmail, ownerUserId || null, inviteCode, maxMembers]
     );
 
     const group = result.rows[0] as FFGroup;
 
-    // Crear el owner como miembro activo
+    // Crear el owner como miembro activo (con user_id si está disponible)
     await pool.query(
       `INSERT INTO ff_group_members 
-       (group_id, customer_id, email, role, status, email_verified, joined_at)
-       VALUES ($1, $2, $3, 'owner', 'active', true, NOW())`,
-      [group.id, ownerCustomerId, ownerEmail]
+       (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
+       VALUES ($1, $2, $3, $4, 'owner', 'active', true, NOW())`,
+      [group.id, ownerCustomerId, ownerUserId || null, ownerEmail]
     );
 
     return group;
@@ -108,7 +108,7 @@ export async function getGroupByInviteCode(code: string): Promise<FFGroup | null
 }
 
 /**
- * Obtener grupos de un customer
+ * Obtener grupos de un customer (por customer_id)
  */
 export async function getGroupsByCustomerId(
   customerId: string,
@@ -133,6 +133,36 @@ export async function getGroupsByCustomerId(
     return result.rows as FFGroup[];
   } catch (error) {
     console.error('Error getting groups by customer id:', error);
+    return [];
+  }
+}
+
+/**
+ * Obtener grupos de un usuario (por user_id)
+ */
+export async function getGroupsByUserId(
+  userId: string,
+  merchantId?: string
+): Promise<FFGroup[]> {
+  try {
+    let query = `
+      SELECT DISTINCT g.* FROM ff_groups g
+      INNER JOIN ff_group_members m ON g.id = m.group_id
+      WHERE m.user_id = $1 AND m.status = 'active'
+    `;
+    const params: any[] = [userId];
+    
+    if (merchantId) {
+      query += ' AND g.merchant_id = $2';
+      params.push(merchantId);
+    }
+    
+    query += ' ORDER BY g.created_at DESC';
+
+    const result = await pool.query(query, params);
+    return result.rows as FFGroup[];
+  } catch (error) {
+    console.error('Error getting groups by user id:', error);
     return [];
   }
 }
@@ -391,7 +421,8 @@ export async function getInvitationByToken(token: string): Promise<FFInvitation 
  */
 export async function acceptInvitation(
   token: string,
-  customerId?: string
+  customerId?: string,
+  userId?: string
 ): Promise<FFGroupMember | null> {
   try {
     const invitation = await getInvitationByToken(token);
@@ -423,24 +454,31 @@ export async function acceptInvitation(
     let member = await getMemberByEmailAndGroup(invitation.email, invitation.group_id);
     
     if (member) {
-      // Actualizar miembro existente
+      // Actualizar miembro existente (agregar user_id si no tiene)
+      if (userId && !member.user_id) {
+        await pool.query(
+          'UPDATE ff_group_members SET user_id = $1 WHERE id = $2',
+          [userId, member.id]
+        );
+      }
+      
       member = await updateMember({
         id: member.id,
         status: 'active',
         emailVerified: true,
       });
     } else {
-      // Crear nuevo miembro
+      // Crear nuevo miembro (con user_id si está disponible)
       const verificationToken = generateVerificationToken();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
 
       const memberResult = await pool.query(
         `INSERT INTO ff_group_members 
-         (group_id, customer_id, email, role, status, email_verified, verification_token, verification_expires_at, joined_at)
-         VALUES ($1, $2, $3, 'member', 'active', true, $4, $5, NOW())
+         (group_id, customer_id, user_id, email, role, status, email_verified, verification_token, verification_expires_at, joined_at)
+         VALUES ($1, $2, $3, $4, 'member', 'active', true, $5, $6, NOW())
          RETURNING *`,
-        [invitation.group_id, customerId || null, invitation.email, verificationToken, expiresAt]
+        [invitation.group_id, customerId || null, userId || null, invitation.email, verificationToken, expiresAt]
       );
       
       member = memberResult.rows[0] as FFGroupMember;

@@ -6,6 +6,7 @@ export interface FFGroup {
   name: string;
   owner_customer_id: string;
   owner_email: string;
+  owner_user_id?: string | null;
   invite_code: string;
   max_members: number;
   current_members: number;
@@ -19,6 +20,7 @@ export interface FFGroupMember {
   id: string;
   group_id: string;
   customer_id: string | null;
+  user_id?: string | null;
   email: string;
   role: 'owner' | 'member';
   status: 'pending' | 'active' | 'removed' | 'inactive';

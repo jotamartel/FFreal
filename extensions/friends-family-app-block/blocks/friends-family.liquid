@@ -1,0 +1,77 @@
+{% comment %}
+  Friends & Family Groups App Block
+  Permite a los usuarios gestionar sus grupos desde la tienda
+{% endcomment %}
+
+{% if block.settings.enabled %}
+  <div id="friends-family-app-root" 
+       data-app-url="{{ block.settings.app_url | default: 'https://shopify-friends-family-app.vercel.app' }}"
+       style="min-height: 400px;">
+    <div style="text-align: center; padding: 40px;">
+      <p>Cargando Friends & Family...</p>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+      
+      const appUrl = document.getElementById('friends-family-app-root').dataset.appUrl;
+      const targetUrl = appUrl + '/tienda';
+      
+      // Crear iframe para cargar la aplicación
+      function initFriendsFamilyApp() {
+        const container = document.getElementById('friends-family-app-root');
+        if (!container) return;
+        
+        // Si ya hay un iframe, no inicializar de nuevo
+        if (container.querySelector('iframe')) return;
+        
+        const iframe = document.createElement('iframe');
+        iframe.src = targetUrl;
+        iframe.style.cssText = `
+          width: 100%;
+          min-height: 600px;
+          border: none;
+          background: transparent;
+        `;
+        iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
+        iframe.setAttribute('title', 'Friends & Family Groups');
+        
+        // Limpiar contenido de carga
+        container.innerHTML = '';
+        container.appendChild(iframe);
+      }
+      
+      // Inicializar cuando el DOM esté listo
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFriendsFamilyApp);
+      } else {
+        initFriendsFamilyApp();
+      }
+    })();
+  </script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Friends & Family Groups",
+  "target": "section",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Habilitar Friends & Family",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "URL de la App",
+      "default": "https://shopify-friends-family-app.vercel.app",
+      "info": "URL base de tu aplicación Friends & Family"
+    }
+  ]
+}
+{% endschema %}
+

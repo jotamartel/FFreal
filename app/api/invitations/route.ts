@@ -1,7 +1,8 @@
 // API routes for Friends & Family Invitations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createInvitation, getInvitationByToken } from '@/lib/database/ff-groups';
+import { createInvitation, getInvitationByToken, getGroupById } from '@/lib/database/ff-groups';
+import { sendInvitationEmail } from '@/lib/email/service';
 
 /**
  * POST /api/invitations - Create a new invitation
@@ -29,6 +30,24 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create invitation. Group may be full or email already in group.' },
         { status: 400 }
       );
+    }
+
+    // Send invitation email
+    try {
+      const group = await getGroupById(groupId);
+      if (group) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const inviteLink = `${baseUrl}/customer/invitations/${invitation.token}`;
+        
+        await sendInvitationEmail(
+          email,
+          group.name,
+          inviteLink
+        );
+      }
+    } catch (emailError) {
+      console.error('Error sending invitation email:', emailError);
+      // Don't fail the invitation creation if email fails
     }
 
     return NextResponse.json({ invitation }, { status: 201 });

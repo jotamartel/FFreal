@@ -1,0 +1,11 @@
+# Extension de Shopify: Friends & Family App Block
+# Permite que los usuarios gestionen sus grupos desde la tienda
+
+api_version = "2024-10"
+
+[[extensions]]
+uid = "7f26ee3c-0733-0391-d8f6-138f9509e9f326bf0ce8"
+type = "theme"
+name = "Friends & Family Groups"
+handle = "friends-family-groups"
+

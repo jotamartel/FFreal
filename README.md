@@ -1,4 +1,4 @@
-# Shopify Friends & Family Discount App
+# Friends and Family Discount App
 
 A standalone Shopify app that enables merchants to offer Friends & Family discount programs with client-side group management, similar to YouTube Premium Family plans. Includes an integrated appointment booking system.
 

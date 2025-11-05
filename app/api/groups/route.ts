@@ -7,28 +7,52 @@ import {
   getGroupsByMerchantId,
   updateGroup 
 } from '@/lib/database/ff-groups';
+import { getSession } from '@/lib/auth/session';
+import { getUserById } from '@/lib/database/users';
 
 /**
- * POST /api/groups - Create a new group
+ * POST /api/groups - Create a new group (requires authentication)
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers } = body;
-
-    if (!merchantId || !name || !ownerCustomerId || !ownerEmail) {
+    // Get user from session
+    const session = await getSession();
+    
+    if (!session) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const user = await getUserById(session.userId);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json();
+    const { merchantId, name, maxMembers } = body;
+
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Group name is required' },
         { status: 400 }
       );
     }
 
+    // Use default merchantId if not provided (for single-tenant apps)
+    const finalMerchantId = merchantId || 'default';
+
     const group = await createGroup({
-      merchantId,
+      merchantId: finalMerchantId,
       name,
-      ownerCustomerId,
-      ownerEmail,
+      ownerCustomerId: user.shopify_customer_id || user.id,
+      ownerEmail: user.email,
       maxMembers,
+      ownerUserId: user.id, // Vincular user_id
     });
 
     if (!group) {

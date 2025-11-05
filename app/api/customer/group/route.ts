@@ -1,25 +1,29 @@
 // API routes for customer's group
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getGroupsByCustomerId } from '@/lib/database/ff-groups';
+import { getGroupsByUserId, getGroupsByCustomerId } from '@/lib/database/ff-groups';
+import { getSession } from '@/lib/auth/session';
 
 /**
- * GET /api/customer/group - Get customer's group
+ * GET /api/customer/group - Get customer's groups (requires authentication)
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const customerId = searchParams.get('customerId');
-    const merchantId = searchParams.get('merchantId');
-
-    if (!customerId) {
+    // Get user from session
+    const session = await getSession();
+    
+    if (!session) {
       return NextResponse.json(
-        { error: 'customerId is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
 
-    const groups = await getGroupsByCustomerId(customerId, merchantId || undefined);
+    const { searchParams } = new URL(request.url);
+    const merchantId = searchParams.get('merchantId');
+
+    // Get groups by user_id (preferred) or fallback to customer_id if user_id not available
+    const groups = await getGroupsByUserId(session.userId, merchantId || undefined);
 
     return NextResponse.json({ groups }, { status: 200 });
   } catch (error) {
