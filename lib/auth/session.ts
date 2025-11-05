@@ -41,19 +41,26 @@ export function createToken(payload: SessionPayload): string {
  */
 export function verifyToken(token: string): SessionPayload | null {
   try {
+    // Siempre log para debugging en producción
+    console.log('[verifyToken] Iniciando verificación:', {
+      hasSecret: !!JWT_SECRET,
+      secretLength: JWT_SECRET?.length || 0,
+      usingFallback: JWT_SECRET === 'fallback-secret-change-in-production',
+      secretPreview: JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...${JWT_SECRET.substring(JWT_SECRET.length - 10)}` : 'none',
+      tokenLength: token.length,
+    });
+    
     if (!JWT_SECRET || JWT_SECRET === 'fallback-secret-change-in-production') {
       console.error('[verifyToken] ⚠️ SESSION_SECRET no está configurado o usa el valor por defecto');
     }
     
     const decoded = jwt.verify(token, JWT_SECRET) as SessionPayload;
     
-    if (process.env.DEBUG_DB === 'true') {
-      console.log('[verifyToken] ✅ Token válido:', {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
-      });
-    }
+    console.log('[verifyToken] ✅ Token válido:', {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
+    });
     
     return decoded;
   } catch (error: any) {
@@ -63,6 +70,7 @@ export function verifyToken(token: string): SessionPayload | null {
       name: error.name,
       hasSecret: !!JWT_SECRET,
       secretLength: JWT_SECRET?.length || 0,
+      secretPreview: JWT_SECRET ? `${JWT_SECRET.substring(0, 10)}...${JWT_SECRET.substring(JWT_SECRET.length - 10)}` : 'none',
       tokenPreview: token.substring(0, 50) + '...',
     });
     return null;
