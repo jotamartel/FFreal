@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserCredentials } from '@/lib/database/users';
-import { setSession } from '@/lib/auth/session';
+import { createToken } from '@/lib/auth/session';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,14 +32,19 @@ export async function POST(request: NextRequest) {
 
     console.log('[LOGIN] ✅ Usuario autenticado:', { id: user.id, email: user.email });
 
-    // Create session
-    await setSession({
+    // Create session token
+    const token = createToken({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
-    return NextResponse.json({
+    // Determine if we should use secure cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isSecure = isProduction || process.env.VERCEL === '1';
+
+    // Create response with user data
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -48,6 +53,22 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     });
+
+    // Set cookie directly in response headers for immediate availability
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+
+    console.log('[LOGIN] Cookie establecida en respuesta:', { 
+      hasToken: !!token, 
+      secure: isSecure 
+    });
+
+    return response;
   } catch (error) {
     console.error('Error in login:', error);
     return NextResponse.json(
