@@ -16,9 +16,24 @@ export interface SessionPayload {
  * Create a JWT token
  */
 export function createToken(payload: SessionPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  if (!JWT_SECRET || JWT_SECRET === 'fallback-secret-change-in-production') {
+    console.error('[createToken] ⚠️ SESSION_SECRET no está configurado o usa el valor por defecto');
+  }
+  
+  const token = jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
+  
+  if (process.env.DEBUG_DB === 'true') {
+    console.log('[createToken] Token creado:', {
+      userId: payload.userId,
+      email: payload.email,
+      secretLength: JWT_SECRET?.length || 0,
+      usingFallback: JWT_SECRET === 'fallback-secret-change-in-production',
+    });
+  }
+  
+  return token;
 }
 
 /**
@@ -26,9 +41,30 @@ export function createToken(payload: SessionPayload): string {
  */
 export function verifyToken(token: string): SessionPayload | null {
   try {
+    if (!JWT_SECRET || JWT_SECRET === 'fallback-secret-change-in-production') {
+      console.error('[verifyToken] ⚠️ SESSION_SECRET no está configurado o usa el valor por defecto');
+    }
+    
     const decoded = jwt.verify(token, JWT_SECRET) as SessionPayload;
+    
+    if (process.env.DEBUG_DB === 'true') {
+      console.log('[verifyToken] ✅ Token válido:', {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+      });
+    }
+    
     return decoded;
-  } catch (error) {
+  } catch (error: any) {
+    // Log el error específico para debugging
+    console.error('[verifyToken] ❌ Error verificando token:', {
+      error: error.message,
+      name: error.name,
+      hasSecret: !!JWT_SECRET,
+      secretLength: JWT_SECRET?.length || 0,
+      tokenPreview: token.substring(0, 50) + '...',
+    });
     return null;
   }
 }
