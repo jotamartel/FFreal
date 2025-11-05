@@ -264,7 +264,8 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (groupError: any) {
-        results.errors.push(`Error importing group ${group.name}: ${groupError.message}`);
+        const groupName = groupData?.name || 'unknown';
+        results.errors.push(`Error importing group ${groupName}: ${groupError.message}`);
       }
     }
 
