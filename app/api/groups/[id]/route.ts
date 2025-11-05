@@ -1,7 +1,7 @@
 // API routes for individual Friends & Family Group
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getGroupById, updateGroup, getGroupMembers } from '@/lib/database/ff-groups';
+import { getGroupById, updateGroup, getGroupMembers, syncGroupMemberCount } from '@/lib/database/ff-groups';
 
 /**
  * GET /api/groups/[id] - Get group details
@@ -20,12 +20,25 @@ export async function GET(
       );
     }
 
-    // Get members
-    const members = await getGroupMembers(params.id);
+    // Sync member count first to ensure accuracy
+    await syncGroupMemberCount(params.id);
+    
+    // Get updated group with correct count
+    const updatedGroup = await getGroupById(params.id);
+    
+    // Get members (include all statuses for admin view)
+    const allMembers = await getGroupMembers(params.id, true);
+    const activeMembers = allMembers.filter(m => m.status === 'active');
 
     return NextResponse.json({ 
-      group,
-      members 
+      group: updatedGroup || group,
+      members: activeMembers, // Show only active members by default
+      allMembers: allMembers, // Include all for reference
+      memberCountBreakdown: {
+        total: allMembers.length,
+        active: activeMembers.length,
+        inactive: allMembers.filter(m => m.status !== 'active').length,
+      },
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting group:', error);

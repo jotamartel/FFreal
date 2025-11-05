@@ -36,6 +36,17 @@ interface Member {
   joined_at: string;
 }
 
+interface GroupData {
+  group: Group;
+  members: Member[];
+  allMembers?: Member[];
+  memberCountBreakdown?: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
+}
+
 export default function GroupDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -53,10 +64,15 @@ export default function GroupDetailPage() {
   const loadGroup = async () => {
     try {
       const groupResponse = await fetch(`/api/groups/${groupId}`);
-      const groupData = await groupResponse.json();
+      const groupData: GroupData = await groupResponse.json();
       
       setGroup(groupData.group);
       setMembers(groupData.members || []);
+      
+      // Log breakdown if available for debugging
+      if (groupData.memberCountBreakdown) {
+        console.log('[GROUP] Member count breakdown:', groupData.memberCountBreakdown);
+      }
     } catch (error) {
       console.error('Error loading group:', error);
     } finally {
@@ -244,9 +260,38 @@ export default function GroupDetailPage() {
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Group Members ({members.length})
-              </Text>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Group Members ({members.length})
+                </Text>
+                {group.current_members !== members.length && (
+                  <Button
+                    variant="secondary"
+                    size="slim"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/admin/groups/${groupId}/sync-members`, {
+                          method: 'POST',
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          loadGroup();
+                        }
+                      } catch (error) {
+                        console.error('Error syncing:', error);
+                      }
+                    }}
+                  >
+                    Sync Count
+                  </Button>
+                )}
+              </InlineStack>
+              
+              {group.current_members !== members.length && (
+                <Banner tone="attention">
+                  Member count mismatch: Database shows {group.current_members} but there are {members.length} active members. Click "Sync Count" to fix.
+                </Banner>
+              )}
 
               {members.length === 0 ? (
                 <Text as="p" variant="bodyMd" tone="subdued">

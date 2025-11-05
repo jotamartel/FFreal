@@ -301,16 +301,55 @@ export async function updateGroup(
 /**
  * Obtener miembros de un grupo
  */
-export async function getGroupMembers(groupId: string): Promise<FFGroupMember[]> {
+export async function getGroupMembers(groupId: string, includeInactive: boolean = false): Promise<FFGroupMember[]> {
   try {
-    const result = await pool.query(
-      'SELECT * FROM ff_group_members WHERE group_id = $1 ORDER BY created_at ASC',
-      [groupId]
-    );
+    let query = 'SELECT * FROM ff_group_members WHERE group_id = $1';
+    const params: any[] = [groupId];
+    
+    if (!includeInactive) {
+      // By default, only show active members
+      query += ' AND status = $2';
+      params.push('active');
+    }
+    
+    query += ' ORDER BY created_at ASC';
+    
+    const result = await pool.query(query, params);
     return result.rows as FFGroupMember[];
   } catch (error) {
     console.error('Error getting group members:', error);
     return [];
+  }
+}
+
+/**
+ * Sincronizar el contador current_members con la cantidad real de miembros activos
+ */
+export async function syncGroupMemberCount(groupId: string): Promise<boolean> {
+  try {
+    // Contar miembros activos reales
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count 
+       FROM ff_group_members 
+       WHERE group_id = $1 AND status = 'active'`,
+      [groupId]
+    );
+
+    const actualCount = parseInt(countResult.rows[0]?.count || '0');
+
+    // Actualizar current_members
+    await pool.query(
+      `UPDATE ff_groups 
+       SET current_members = $1, updated_at = NOW() 
+       WHERE id = $2`,
+      [actualCount, groupId]
+    );
+
+    console.log(`[SYNC] Group ${groupId}: Updated current_members to ${actualCount}`);
+    return true;
+  } catch (error) {
+    console.error('Error syncing group member count:', error);
+    return false;
   }
 }
 
