@@ -22,7 +22,14 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
       return { success: false, error: errorMsg };
     }
 
-    const fromEmail = options.from || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    // Use verified domain or default to Resend test domain
+    let fromEmail = options.from || process.env.RESEND_FROM_EMAIL;
+    
+    // If no from email is set, or if it's a placeholder, use Resend test domain
+    if (!fromEmail || fromEmail.includes('yourdomain.com') || fromEmail.includes('example.com')) {
+      fromEmail = 'onboarding@resend.dev';
+      console.warn('[EMAIL] Using Resend test domain. Configure RESEND_FROM_EMAIL with a verified domain for production.');
+    }
     
     console.log('[EMAIL] Attempting to send email:', {
       to: options.to,
