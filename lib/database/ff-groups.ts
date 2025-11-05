@@ -145,15 +145,37 @@ export async function getGroupsByUserId(
   merchantId?: string
 ): Promise<FFGroup[]> {
   try {
-    let query = `
-      SELECT DISTINCT g.* FROM ff_groups g
-      INNER JOIN ff_group_members m ON g.id = m.group_id
-      WHERE m.user_id = $1 AND m.status = 'active'
-    `;
-    const params: any[] = [userId];
+    // Primero verificar si la columna user_id existe
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ff_group_members' AND column_name = 'user_id'
+    `);
+    
+    const hasUserIdColumn = columnCheck.rows.length > 0;
+    
+    let query: string;
+    const params: any[] = [];
+    
+    if (hasUserIdColumn) {
+      // Usar user_id si la columna existe
+      query = `
+        SELECT DISTINCT g.* FROM ff_groups g
+        INNER JOIN ff_group_members m ON g.id = m.group_id
+        WHERE (m.user_id = $1 OR g.owner_user_id = $1) AND m.status = 'active'
+      `;
+      params.push(userId);
+    } else {
+      // Fallback: buscar por owner_user_id en ff_groups si la columna no existe
+      query = `
+        SELECT DISTINCT g.* FROM ff_groups g
+        WHERE g.owner_user_id = $1
+      `;
+      params.push(userId);
+    }
     
     if (merchantId) {
-      query += ' AND g.merchant_id = $2';
+      query += ` AND g.merchant_id = $${params.length + 1}`;
       params.push(merchantId);
     }
     
