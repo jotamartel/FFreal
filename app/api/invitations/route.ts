@@ -33,22 +33,47 @@ export async function POST(request: NextRequest) {
     }
 
     // Send invitation email
+    let emailSent = false;
+    let emailError: string | null = null;
+    
     try {
       const group = await getGroupById(groupId);
       if (group) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const inviteLink = `${baseUrl}/customer/invitations/${invitation.token}`;
         
-        await sendInvitationEmail(
+        console.log('[INVITATION] Sending invitation email:', {
+          email,
+          groupName: group.name,
+          inviteLink,
+          hasResendKey: !!process.env.RESEND_API_KEY,
+        });
+        
+        emailSent = await sendInvitationEmail(
           email,
           group.name,
           inviteLink
         );
+
+        if (!emailSent) {
+          emailError = 'Email service not configured or failed to send';
+          console.warn('[INVITATION] Email not sent, but invitation was created');
+        }
       }
     } catch (emailError) {
-      console.error('Error sending invitation email:', emailError);
+      console.error('[INVITATION] Error sending invitation email:', emailError);
+      emailError = emailError instanceof Error ? emailError.message : 'Unknown error';
       // Don't fail the invitation creation if email fails
     }
+
+    return NextResponse.json(
+      { 
+        invitation,
+        emailSent,
+        emailError: emailError || undefined,
+      },
+      { status: 201 }
+    );
 
     return NextResponse.json({ invitation }, { status: 201 });
   } catch (error) {

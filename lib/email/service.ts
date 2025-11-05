@@ -14,24 +14,54 @@ export interface EmailOptions {
   from?: string;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<boolean> {
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
   try {
     if (!process.env.RESEND_API_KEY || !resend) {
-      console.warn('RESEND_API_KEY not configured, skipping email send');
-      return false;
+      const errorMsg = 'RESEND_API_KEY not configured, skipping email send';
+      console.error('[EMAIL]', errorMsg);
+      return { success: false, error: errorMsg };
     }
 
+    const fromEmail = options.from || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    
+    console.log('[EMAIL] Attempting to send email:', {
+      to: options.to,
+      from: fromEmail,
+      subject: options.subject,
+      hasApiKey: !!process.env.RESEND_API_KEY,
+      apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 5) + '...',
+    });
+
     const result = await resend.emails.send({
-      from: options.from || 'noreply@yourdomain.com',
+      from: fromEmail,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    return !!result.data;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    return false;
+    if (result.error) {
+      console.error('[EMAIL] Resend API error:', result.error);
+      return { success: false, error: JSON.stringify(result.error) };
+    }
+
+    if (result.data) {
+      console.log('[EMAIL] Email sent successfully:', {
+        id: result.data.id,
+        to: options.to,
+        from: fromEmail,
+      });
+      return { success: true };
+    }
+
+    console.error('[EMAIL] No data returned from Resend');
+    return { success: false, error: 'No data returned from Resend API' };
+  } catch (error: any) {
+    console.error('[EMAIL] Error sending email:', {
+      error: error.message,
+      stack: error.stack,
+      to: options.to,
+    });
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
 
@@ -76,11 +106,17 @@ export async function sendInvitationEmail(
     </html>
   `;
 
-  return sendEmail({
+  const result = await sendEmail({
     to: email,
     subject: `Invitation to join ${groupName} - Friends & Family`,
     html,
   });
+
+  if (!result.success) {
+    console.error('[EMAIL] Failed to send invitation email:', result.error);
+  }
+
+  return result.success;
 }
 
 /**
