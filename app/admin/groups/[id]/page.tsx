@@ -257,6 +257,16 @@ export default function GroupDetailPage() {
           </Card>
         </Layout.Section>
 
+        {group.current_members !== members.length && (
+          <Layout.Section>
+            <Banner tone="attention" title="Member Count Mismatch">
+              <Text as="p">
+                Database shows {group.current_members} members but there are {members.length} active members. Click "Sync Count" to fix.
+              </Text>
+            </Banner>
+          </Layout.Section>
+        )}
+
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
@@ -286,12 +296,6 @@ export default function GroupDetailPage() {
                   </Button>
                 )}
               </InlineStack>
-              
-              {group.current_members !== members.length && (
-                <Banner tone="attention">
-                  Member count mismatch: Database shows {group.current_members} but there are {members.length} active members. Click "Sync Count" to fix.
-                </Banner>
-              )}
 
               {members.length === 0 ? (
                 <Text as="p" variant="bodyMd" tone="subdued">
