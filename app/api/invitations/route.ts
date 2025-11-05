@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
           console.warn('[INVITATION] Email not sent, but invitation was created');
         }
       }
-    } catch (emailError) {
-      console.error('[INVITATION] Error sending invitation email:', emailError);
-      emailError = emailError instanceof Error ? emailError.message : 'Unknown error';
+    } catch (err) {
+      console.error('[INVITATION] Error sending invitation email:', err);
+      emailError = err instanceof Error ? err.message : 'Unknown error';
       // Don't fail the invitation creation if email fails
     }
 
@@ -74,8 +74,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-
-    return NextResponse.json({ invitation }, { status: 201 });
   } catch (error) {
     console.error('Error creating invitation:', error);
     return NextResponse.json(

@@ -158,10 +158,16 @@ export async function sendVerificationEmail(
     </html>
   `;
 
-  return sendEmail({
+  const result = await sendEmail({
     to: email,
     subject: 'Verify your email address - Friends & Family',
     html,
   });
+
+  if (!result.success) {
+    console.error('[EMAIL] Failed to send verification email:', result.error);
+  }
+
+  return result.success;
 }
 
