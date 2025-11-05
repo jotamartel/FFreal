@@ -9,22 +9,32 @@ if (!connectionString) {
   console.warn('⚠️ DATABASE_URL or POSTGRES_URL not configured');
 }
 
+// Detectar si es Supabase (más robusto)
+const isSupabase = 
+  connectionString?.includes('supabase.co') ||
+  connectionString?.includes('supabase') ||
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 // Configurar SSL para Supabase/Vercel Postgres
-// Supabase requiere SSL pero con configuración específica para certificados
+// Supabase requiere SSL pero con configuración específica para certificados auto-firmados
+// En producción, siempre usar SSL para Supabase
+const sslConfig = isSupabase || connectionString?.includes('sslmode=require')
+  ? {
+      rejectUnauthorized: false,
+      // Permitir certificados auto-firmados de Supabase
+      checkServerIdentity: () => undefined,
+    }
+  : connectionString && !connectionString.includes('localhost')
+  ? {
+      rejectUnauthorized: false,
+      checkServerIdentity: () => undefined,
+    }
+  : false;
+
 export const pool = new Pool({
   connectionString,
-  ssl: connectionString?.includes('supabase') || connectionString?.includes('sslmode=require')
-    ? {
-        rejectUnauthorized: false,
-        // Permitir certificados auto-firmados de Supabase
-        checkServerIdentity: () => undefined,
-      }
-    : connectionString
-    ? {
-        rejectUnauthorized: false,
-        checkServerIdentity: () => undefined,
-      }
-    : false,
+  ssl: sslConfig,
 });
 
 // Test connection
