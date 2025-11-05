@@ -11,17 +11,23 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const merchantId = searchParams.get('merchantId');
+    let merchantId = searchParams.get('merchantId');
     const status = searchParams.get('status') as 'active' | 'suspended' | 'terminated' | null;
 
+    // If no merchantId provided, default to 'default' for single-tenant apps
+    // In multi-tenant apps, this would come from Shopify session
     if (!merchantId) {
-      return NextResponse.json(
-        { error: 'merchantId is required' },
-        { status: 400 }
-      );
+      merchantId = 'default';
     }
 
+    console.log('[ADMIN GROUPS] Fetching groups:', {
+      merchantId,
+      status: status || 'all',
+    });
+
     const groups = await getGroupsByMerchantId(merchantId, status || undefined);
+
+    console.log('[ADMIN GROUPS] Found groups:', groups.length);
 
     return NextResponse.json({ groups }, { status: 200 });
   } catch (error) {

@@ -41,16 +41,25 @@ export default function GroupsPage() {
 
   const loadGroups = async () => {
     try {
-      const merchantId = 'demo-merchant'; // Replace with actual merchant ID
+      // Use 'default' to match groups created from frontend
+      // In a multi-tenant app, this would come from Shopify session
+      const merchantId = 'default';
       const status = statusFilter === 'all' ? undefined : statusFilter;
       const url = `/api/admin/groups?merchantId=${merchantId}${status ? `&status=${status}` : ''}`;
       
       const response = await fetch(url);
       const data = await response.json();
       
+      if (!response.ok) {
+        console.error('Error loading groups:', data.error);
+        setGroups([]);
+        return;
+      }
+      
       setGroups(data.groups || []);
     } catch (error) {
       console.error('Error loading groups:', error);
+      setGroups([]);
     } finally {
       setLoading(false);
     }
