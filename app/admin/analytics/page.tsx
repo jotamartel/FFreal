@@ -42,13 +42,22 @@ export default function AnalyticsPage() {
 
   const loadAnalytics = async () => {
     try {
-      const merchantId = 'demo-merchant'; // Replace with actual merchant ID
+      // Use 'default' to match groups created from frontend
+      // In a multi-tenant app, this would come from Shopify session
+      const merchantId = 'default';
       const response = await fetch(`/api/admin/analytics?merchantId=${merchantId}`);
-      const data = await response.json();
       
+      if (!response.ok) {
+        console.error('Error loading analytics:', response.statusText);
+        setAnalytics(null);
+        return;
+      }
+      
+      const data = await response.json();
       setAnalytics(data.analytics);
     } catch (error) {
       console.error('Error loading analytics:', error);
+      setAnalytics(null);
     } finally {
       setLoading(false);
     }

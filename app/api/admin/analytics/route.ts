@@ -11,14 +11,17 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const merchantId = searchParams.get('merchantId');
+    let merchantId = searchParams.get('merchantId');
 
+    // If no merchantId provided, default to 'default' for single-tenant apps
+    // In multi-tenant apps, this would come from Shopify session
     if (!merchantId) {
-      return NextResponse.json(
-        { error: 'merchantId is required' },
-        { status: 400 }
-      );
+      merchantId = 'default';
     }
+
+    console.log('[ADMIN ANALYTICS] Fetching analytics:', {
+      merchantId,
+    });
 
     // Get total active groups
     const groupsResult = await pool.query(
@@ -49,8 +52,16 @@ export async function GET(request: NextRequest) {
       [merchantId]
     );
 
+    // Get total groups (all statuses)
+    const totalGroupsResult = await pool.query(
+      `SELECT COUNT(*) as total 
+       FROM ff_groups 
+       WHERE merchant_id = $1`,
+      [merchantId]
+    );
+
     const analytics = {
-      totalGroups: parseInt(groupsResult.rows[0]?.total || '0'),
+      totalGroups: parseInt(totalGroupsResult.rows[0]?.total || '0'),
       averageGroupSize: parseFloat(groupsResult.rows[0]?.avg_members || '0'),
       totalMembers: parseInt(groupsResult.rows[0]?.total_members || '0'),
       groupsByStatus: statusResult.rows.reduce((acc: any, row: any) => {
@@ -59,6 +70,12 @@ export async function GET(request: NextRequest) {
       }, {}),
       topGroups: topGroupsResult.rows,
     };
+
+    console.log('[ADMIN ANALYTICS] Analytics data:', {
+      totalGroups: analytics.totalGroups,
+      totalMembers: analytics.totalMembers,
+      activeGroups: analytics.groupsByStatus.active || 0,
+    });
 
     return NextResponse.json({ analytics }, { status: 200 });
   } catch (error) {
