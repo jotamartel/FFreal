@@ -230,9 +230,37 @@ export default function GroupDetailPage() {
                   <Text as="p" variant="bodyMd" fontWeight="semibold">
                     Members:
                   </Text>
-                  <Text as="p" variant="bodyMd">
-                    {group.current_members} / {group.max_members}
-                  </Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="p" variant="bodyMd">
+                      {members.length} / {group.max_members}
+                    </Text>
+                    {group.current_members !== members.length && (
+                      <>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          (DB: {group.current_members})
+                        </Text>
+                        <Button
+                          variant="plain"
+                          size="micro"
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`/api/admin/groups/${groupId}/sync-members`, {
+                                method: 'POST',
+                              });
+                              const result = await response.json();
+                              if (result.success) {
+                                loadGroup();
+                              }
+                            } catch (error) {
+                              console.error('Error syncing:', error);
+                            }
+                          }}
+                        >
+                          Sync
+                        </Button>
+                      </>
+                    )}
+                  </InlineStack>
                 </div>
 
                 <div>
@@ -257,43 +285,13 @@ export default function GroupDetailPage() {
           </Card>
         </Layout.Section>
 
-        {group.current_members !== members.length && (
-          <Layout.Section>
-            <Banner tone="attention" title="Member Count Mismatch">
-              Database shows {group.current_members} members but there are {members.length} active members. Click "Sync Count" to fix.
-            </Banner>
-          </Layout.Section>
-        )}
 
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h2" variant="headingMd">
-                  Group Members ({members.length})
-                </Text>
-                {group.current_members !== members.length && (
-                  <Button
-                    variant="secondary"
-                    size="slim"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(`/api/admin/groups/${groupId}/sync-members`, {
-                          method: 'POST',
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                          loadGroup();
-                        }
-                      } catch (error) {
-                        console.error('Error syncing:', error);
-                      }
-                    }}
-                  >
-                    Sync Count
-                  </Button>
-                )}
-              </InlineStack>
+              <Text as="h2" variant="headingMd">
+                Group Members ({members.length})
+              </Text>
 
               {members.length === 0 ? (
                 <Text as="p" variant="bodyMd" tone="subdued">
