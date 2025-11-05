@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDiscountConfig, upsertDiscountConfig } from '@/lib/database/ff-groups';
 import { UpdateDiscountConfigParams } from '@/types/ff-groups';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/config - Get discount configuration
  */

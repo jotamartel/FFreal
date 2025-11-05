@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveBranches, getAllBranches } from '@/lib/database/branches';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/branches - Get branches
  */

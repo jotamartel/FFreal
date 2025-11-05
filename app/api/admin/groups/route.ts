@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGroupsByMerchantId, updateGroup } from '@/lib/database/ff-groups';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/groups - Get all groups for merchant
  */

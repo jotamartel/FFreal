@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGroupsByUserId, getGroupsByCustomerId } from '@/lib/database/ff-groups';
 import { getSession } from '@/lib/auth/session';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/customer/group - Get customer's groups (requires authentication)
  */

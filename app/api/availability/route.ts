@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAvailableSlotsForDate, getNextAvailableDays } from '@/lib/database/availability';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/availability - Get available slots
  */
