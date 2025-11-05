@@ -30,7 +30,7 @@ export default function AdminDashboard() {
   return (
     <Page
       title="Friends & Family Dashboard"
-      subtitle="Manage discount groups and appointments"
+      subtitle="Manage discount groups"
     >
       <Layout>
         <Layout.Section>

@@ -163,20 +163,13 @@ export default function CustomerPortal() {
               <Text as="h2" variant="headingMd">
                 Quick Actions
               </Text>
-              <InlineStack gap="400">
-                <Button
-                  variant="primary"
-                  onClick={() => router.push('/customer/groups/new')}
-                  disabled={activeGroup !== undefined}
-                >
-                  Create New Group
-                </Button>
-                <Button
-                  onClick={() => router.push('/customer/appointments')}
-                >
-                  My Appointments
-                </Button>
-              </InlineStack>
+              <Button
+                variant="primary"
+                onClick={() => router.push('/customer/groups/new')}
+                disabled={activeGroup !== undefined}
+              >
+                Create New Group
+              </Button>
             </BlockStack>
           </Card>
         </Layout.Section>
