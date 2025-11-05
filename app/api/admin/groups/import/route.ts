@@ -258,7 +258,8 @@ export async function POST(request: NextRequest) {
                 );
               }
             } catch (memberError: any) {
-              results.errors.push(`Error importing member ${member.email}: ${memberError.message}`);
+              const memberEmail = memberData?.email || 'unknown';
+              results.errors.push(`Error importing member ${memberEmail}: ${memberError.message}`);
             }
           }
         }
