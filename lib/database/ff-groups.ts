@@ -593,6 +593,7 @@ export async function joinGroupByCode(
 
     // Crear o actualizar miembro
     let member: FFGroupMember | null = null;
+    let isNewMember = false;
 
     if (existingMember) {
       // Actualizar miembro existente
@@ -608,8 +609,10 @@ export async function joinGroupByCode(
         );
       }
       member = await getMemberById(existingMember.id);
+      // No incrementar contador si el miembro ya existía
     } else {
       // Crear nuevo miembro
+      isNewMember = true;
       if (hasMemberUserId && userId) {
         const result = await pool.query(
           `INSERT INTO ff_group_members 
@@ -631,11 +634,13 @@ export async function joinGroupByCode(
       }
     }
 
-    // Actualizar contador de miembros del grupo
-    await pool.query(
-      'UPDATE ff_groups SET current_members = current_members + 1, updated_at = NOW() WHERE id = $1',
-      [group.id]
-    );
+    // Actualizar contador de miembros del grupo solo si es un nuevo miembro
+    if (isNewMember) {
+      await pool.query(
+        'UPDATE ff_groups SET current_members = current_members + 1, updated_at = NOW() WHERE id = $1',
+        [group.id]
+      );
+    }
 
     return member;
   } catch (error) {
