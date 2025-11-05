@@ -63,8 +63,13 @@ export default function LoginPage() {
       }
 
       // Success - redirect to redirect param or default
+      // Use window.location.href instead of router.push to ensure cookie is set
       const redirect = new URLSearchParams(window.location.search).get('redirect') || '/customer';
-      router.push(redirect);
+      
+      // Small delay to ensure cookie is set
+      setTimeout(() => {
+        window.location.href = redirect;
+      }, 100);
     } catch (error) {
       console.error('Login error:', error);
       setError('An unexpected error occurred');

@@ -54,13 +54,26 @@ export async function setSession(payload: SessionPayload): Promise<void> {
   const token = createToken(payload);
   const cookieStore = await cookies();
   
+  // En producción, usar secure siempre que sea HTTPS
+  // En desarrollo, no usar secure para permitir localhost
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isSecure = isProduction || process.env.VERCEL === '1';
+  
   cookieStore.set('auth-token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: '/',
   });
+  
+  if (process.env.DEBUG_DB === 'true') {
+    console.log('[Session] Cookie establecida:', {
+      userId: payload.userId,
+      email: payload.email,
+      secure: isSecure,
+    });
+  }
 }
 
 /**
