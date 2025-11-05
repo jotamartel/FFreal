@@ -18,6 +18,16 @@ export function middleware(request: NextRequest) {
 
   // Get token from cookies
   const token = request.cookies.get('auth-token')?.value;
+  
+  // Log for debugging (only in development)
+  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DB === 'true') {
+    console.log('[Middleware]', {
+      pathname,
+      hasToken: !!token,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
+    });
+  }
+  
   const isAuthenticated = token ? verifyToken(token) !== null : false;
 
   // Check if route is protected
