@@ -5,6 +5,7 @@ import {
   createGroup, 
   getGroupsByCustomerId, 
   getGroupsByMerchantId,
+  getGroupByInviteCode,
   updateGroup 
 } from '@/lib/database/ff-groups';
 import { getSession } from '@/lib/auth/session';
@@ -73,17 +74,30 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/groups - Get groups for a customer or merchant
+ * GET /api/groups - Get groups for a customer or merchant, or search by invite code
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
     const merchantId = searchParams.get('merchantId');
+    const inviteCode = searchParams.get('inviteCode');
+
+    // Si hay un inviteCode, buscar por código
+    if (inviteCode) {
+      const group = await getGroupByInviteCode(inviteCode);
+      if (!group) {
+        return NextResponse.json(
+          { error: 'Grupo no encontrado. Verifica el código de invitación.' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ group }, { status: 200 });
+    }
 
     if (!customerId && !merchantId) {
       return NextResponse.json(
-        { error: 'customerId or merchantId required' },
+        { error: 'customerId, merchantId, or inviteCode required' },
         { status: 400 }
       );
     }

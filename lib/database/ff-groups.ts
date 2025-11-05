@@ -557,6 +557,94 @@ export async function acceptInvitation(
 }
 
 /**
+ * Unirse a un grupo usando el código de invitación
+ */
+export async function joinGroupByCode(
+  inviteCode: string,
+  email: string,
+  customerId?: string,
+  userId?: string
+): Promise<FFGroupMember | null> {
+  try {
+    // Buscar el grupo por código
+    const group = await getGroupByInviteCode(inviteCode);
+    if (!group || group.status !== 'active') {
+      return null;
+    }
+
+    // Verificar que el grupo no esté lleno
+    if (group.current_members >= group.max_members) {
+      return null;
+    }
+
+    // Verificar que el email no esté ya en el grupo
+    const existingMember = await getMemberByEmailAndGroup(email, group.id);
+    if (existingMember && existingMember.status === 'active') {
+      return null; // Ya es miembro activo
+    }
+
+    // Verificar columnas disponibles
+    const membersColumns = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ff_group_members' AND column_name IN ('user_id')
+    `);
+    const hasMemberUserId = membersColumns.rows.length > 0;
+
+    // Crear o actualizar miembro
+    let member: FFGroupMember | null = null;
+
+    if (existingMember) {
+      // Actualizar miembro existente
+      if (userId && hasMemberUserId) {
+        await pool.query(
+          'UPDATE ff_group_members SET user_id = $1, status = $2, email_verified = $3, joined_at = NOW() WHERE id = $4',
+          [userId, 'active', true, existingMember.id]
+        );
+      } else {
+        await pool.query(
+          'UPDATE ff_group_members SET status = $1, email_verified = $2, joined_at = NOW() WHERE id = $3',
+          ['active', true, existingMember.id]
+        );
+      }
+      member = await getMemberById(existingMember.id);
+    } else {
+      // Crear nuevo miembro
+      if (hasMemberUserId && userId) {
+        const result = await pool.query(
+          `INSERT INTO ff_group_members 
+           (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
+           VALUES ($1, $2, $3, $4, 'member', 'active', true, NOW())
+           RETURNING *`,
+          [group.id, customerId || null, userId, email]
+        );
+        member = result.rows[0] as FFGroupMember;
+      } else {
+        const result = await pool.query(
+          `INSERT INTO ff_group_members 
+           (group_id, customer_id, email, role, status, email_verified, joined_at)
+           VALUES ($1, $2, $3, 'member', 'active', true, NOW())
+           RETURNING *`,
+          [group.id, customerId || null, email]
+        );
+        member = result.rows[0] as FFGroupMember;
+      }
+    }
+
+    // Actualizar contador de miembros del grupo
+    await pool.query(
+      'UPDATE ff_groups SET current_members = current_members + 1, updated_at = NOW() WHERE id = $1',
+      [group.id]
+    );
+
+    return member;
+  } catch (error) {
+    console.error('Error joining group by code:', error);
+    return null;
+  }
+}
+
+/**
  * Obtener configuración de descuento
  */
 export async function getDiscountConfig(merchantId: string): Promise<FFDiscountConfig | null> {
