@@ -118,7 +118,6 @@ export default function JoinGroupPage() {
                     placeholder="Ej: 98E818AE4474BFF4"
                     disabled={loading || joining}
                     autoComplete="off"
-                    autoCapitalize="characters"
                   />
                 </div>
                 <Button
