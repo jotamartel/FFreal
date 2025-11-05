@@ -70,21 +70,6 @@ export default function AdminDashboard() {
                     </BlockStack>
                   </Card>
                 </div>
-                <div
-                  onClick={() => router.push(getRoute('/admin/appointments'))}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <Card>
-                    <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">
-                        Appointments
-                      </Text>
-                      <Text as="p" variant="bodyMd" tone="subdued">
-                        Manage appointments
-                      </Text>
-                    </BlockStack>
-                  </Card>
-                </div>
               </InlineGrid>
             </BlockStack>
           </Card>
