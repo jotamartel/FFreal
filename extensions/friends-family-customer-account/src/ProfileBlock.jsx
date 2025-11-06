@@ -10,6 +10,13 @@ function FriendsFamilyBlock() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [createGroupError, setCreateGroupError] = useState(null);
+  
+  // Form state
+  const [groupName, setGroupName] = useState('');
+  const [maxMembers, setMaxMembers] = useState('6');
 
   useEffect(() => {
     fetchGroups();
@@ -128,6 +135,82 @@ function FriendsFamilyBlock() {
     );
   }
 
+  async function createGroup() {
+    try {
+      setCreatingGroup(true);
+      setCreateGroupError(null);
+      
+      if (!groupName.trim()) {
+        setCreateGroupError('El nombre del grupo es requerido');
+        return;
+      }
+      
+      const maxMembersNum = parseInt(maxMembers, 10);
+      if (isNaN(maxMembersNum) || maxMembersNum < 2 || maxMembersNum > 20) {
+        setCreateGroupError('El máximo de miembros debe ser entre 2 y 20');
+        return;
+      }
+      
+      // Get session token
+      const sessionToken = await shopify.sessionToken.get();
+      const authenticatedAccount = shopify.authenticatedAccount;
+      const customer = authenticatedAccount?.customer?.value;
+      
+      const appUrl = 'https://shopify-friends-family-app.vercel.app';
+      let apiUrl = `${appUrl}/api/groups`;
+      
+      // Add customer ID to query if available
+      if (customer?.id) {
+        const customerIdMatch = customer.id.match(/Customer\/(\d+)/);
+        if (customerIdMatch && customerIdMatch[1]) {
+          apiUrl += `?customerId=${customerIdMatch[1]}`;
+        }
+      }
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: groupName.trim(),
+          max_members: maxMembersNum,
+          merchantId: 'default',
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Error al crear el grupo';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      console.log('[ProfileBlock] Group created successfully:', data);
+      
+      // Close modal and reset form
+      setShowCreateModal(false);
+      setGroupName('');
+      setMaxMembers('6');
+      
+      // Refresh groups list
+      await fetchGroups();
+    } catch (err) {
+      console.error('[ProfileBlock] Error creating group:', err);
+      setCreateGroupError(err.message || 'Error desconocido al crear el grupo');
+    } finally {
+      setCreatingGroup(false);
+    }
+  }
+
   if (groups.length === 0) {
     return (
       <s-section heading="Friends & Family">
@@ -135,11 +218,77 @@ function FriendsFamilyBlock() {
           <s-text>No tienes grupos activos de Friends & Family.</s-text>
           <s-button 
             variant="primary" 
-            href="https://shopify-friends-family-app.vercel.app/tienda/grupos/nuevo"
-            target="_blank"
+            onClick={() => setShowCreateModal(true)}
           >
             Crear un grupo
           </s-button>
+          
+          {showCreateModal && (
+            <s-modal
+              id="create-group-modal"
+              open={showCreateModal}
+              onClose={() => {
+                setShowCreateModal(false);
+                setCreateGroupError(null);
+                setGroupName('');
+                setMaxMembers('6');
+              }}
+            >
+              <s-stack direction="block" gap="base">
+                <s-heading>Crear Grupo Friends & Family</s-heading>
+                
+                {createGroupError && (
+                  <s-banner tone="critical">
+                    <s-text>{createGroupError}</s-text>
+                  </s-banner>
+                )}
+                
+                <s-text-field
+                  label="Nombre del Grupo"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Ej: Mi Familia"
+                  disabled={creatingGroup}
+                />
+                
+                <s-text-field
+                  type="number"
+                  label="Máximo de Miembros"
+                  value={maxMembers}
+                  onChange={(e) => setMaxMembers(e.target.value)}
+                  min="2"
+                  max="20"
+                  disabled={creatingGroup}
+                />
+                
+                <s-text appearance="subdued">
+                  Máximo de personas que pueden unirse al grupo (incluyéndote)
+                </s-text>
+                
+                <s-stack direction="inline" gap="base" alignment="end">
+                  <s-button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setCreateGroupError(null);
+                      setGroupName('');
+                      setMaxMembers('6');
+                    }}
+                    disabled={creatingGroup}
+                  >
+                    Cancelar
+                  </s-button>
+                  <s-button
+                    variant="primary"
+                    onClick={createGroup}
+                    loading={creatingGroup}
+                  >
+                    Crear Grupo
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            </s-modal>
+          )}
         </s-stack>
       </s-section>
     );
@@ -178,10 +327,13 @@ function FriendsFamilyBlock() {
               
               <s-button 
                 variant="secondary" 
-                href={`https://shopify-friends-family-app.vercel.app/tienda/grupos/${group.id}`}
-                target="_blank"
+                onClick={() => {
+                  // Open group management - we'll create a modal for this too
+                  // For now, just show group details
+                  console.log('Managing group:', group.id);
+                }}
               >
-                Gestionar grupo
+                Ver detalles
               </s-button>
             </s-stack>
           </s-card>
@@ -189,11 +341,77 @@ function FriendsFamilyBlock() {
         
         <s-button 
           variant="primary" 
-          href="https://shopify-friends-family-app.vercel.app/tienda/grupos/nuevo"
-          target="_blank"
+          onClick={() => setShowCreateModal(true)}
         >
           Crear nuevo grupo
         </s-button>
+        
+        {showCreateModal && (
+          <s-modal
+            id="create-group-modal"
+            open={showCreateModal}
+            onClose={() => {
+              setShowCreateModal(false);
+              setCreateGroupError(null);
+              setGroupName('');
+              setMaxMembers('6');
+            }}
+          >
+            <s-stack direction="block" gap="base">
+              <s-heading>Crear Grupo Friends & Family</s-heading>
+              
+              {createGroupError && (
+                <s-banner tone="critical">
+                  <s-text>{createGroupError}</s-text>
+                </s-banner>
+              )}
+              
+              <s-text-field
+                label="Nombre del Grupo"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Ej: Mi Familia"
+                disabled={creatingGroup}
+              />
+              
+              <s-text-field
+                type="number"
+                label="Máximo de Miembros"
+                value={maxMembers}
+                onChange={(e) => setMaxMembers(e.target.value)}
+                min="2"
+                max="20"
+                disabled={creatingGroup}
+              />
+              
+              <s-text appearance="subdued">
+                Máximo de personas que pueden unirse al grupo (incluyéndote)
+              </s-text>
+              
+              <s-stack direction="inline" gap="base" alignment="end">
+                <s-button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateGroupError(null);
+                    setGroupName('');
+                    setMaxMembers('6');
+                  }}
+                  disabled={creatingGroup}
+                >
+                  Cancelar
+                </s-button>
+                <s-button
+                  variant="primary"
+                  onClick={createGroup}
+                  loading={creatingGroup}
+                >
+                  Crear Grupo
+                </s-button>
+              </s-stack>
+            </s-stack>
+          </s-modal>
+        )}
       </s-stack>
     </s-section>
   );

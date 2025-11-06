@@ -9,24 +9,68 @@ import {
   updateGroup 
 } from '@/lib/database/ff-groups';
 import { getSession } from '@/lib/auth/session';
-import { getUserById } from '@/lib/database/users';
+import { getUserById, findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
+import { validateShopifySessionToken, extractCustomerIdFromToken } from '@/lib/auth/shopify-session';
 
 /**
  * POST /api/groups - Create a new group (requires authentication)
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get user from session
-    const session = await getSession();
+    let userId: string | null = null;
     
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Try Shopify session token first (for Customer Account Extensions)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const shopifySessionToken = await validateShopifySessionToken(token);
+        if (shopifySessionToken) {
+          const customerId = extractCustomerIdFromToken(shopifySessionToken);
+          
+          if (customerId) {
+            // Find or create user by Shopify customer ID
+            const user = await findOrCreateUserByShopifyCustomerId(customerId);
+            if (user) {
+              userId = user.id;
+              console.log('[POST /api/groups] ✅ User found/created from Shopify token, userId:', userId);
+            }
+          } else {
+            // Try to get customer ID from query parameter
+            const { searchParams } = new URL(request.url);
+            const customerIdFromQuery = searchParams.get('customerId');
+            
+            if (customerIdFromQuery) {
+              console.log('[POST /api/groups] Using customer ID from query parameter:', customerIdFromQuery);
+              const user = await findOrCreateUserByShopifyCustomerId(customerIdFromQuery);
+              if (user) {
+                userId = user.id;
+                console.log('[POST /api/groups] ✅ User found/created from query param, userId:', userId);
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error('[POST /api/groups] Error validating Shopify session token:', error);
+        // Fall through to JWT session
+      }
+    }
+    
+    // Fallback to JWT session if no Shopify token or if Shopify token didn't work
+    if (!userId) {
+      const session = await getSession();
+      
+      if (!session) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      
+      userId = session.userId;
     }
 
-    const user = await getUserById(session.userId);
+    const user = await getUserById(userId);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -35,7 +79,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { merchantId, name, maxMembers } = body;
+    const { merchantId, name, max_members, maxMembers } = body;
+    
+    // Support both max_members and maxMembers for compatibility
+    const finalMaxMembers = max_members || maxMembers || 6;
 
     if (!name) {
       return NextResponse.json(
@@ -52,7 +99,7 @@ export async function POST(request: NextRequest) {
       name,
       ownerCustomerId: user.shopify_customer_id || user.id,
       ownerEmail: user.email,
-      maxMembers,
+      maxMembers: finalMaxMembers,
       ownerUserId: user.id, // Vincular user_id
     });
 
