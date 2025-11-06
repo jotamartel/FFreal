@@ -12,7 +12,7 @@ import {
   UpdateMemberParams,
   UpdateDiscountConfigParams,
 } from '@/types/ff-groups';
-import { getOrCreateShopifyCustomer } from '@/lib/shopify/admin';
+import { getOrCreateShopifyCustomer, createDiscountCode } from '@/lib/shopify/admin';
 import { createUser, getUserByEmail, updateUser, findOrCreateUserByShopifyCustomerId } from './users';
 import crypto from 'crypto';
 
@@ -67,6 +67,74 @@ export async function createGroup(
       attempts++;
     }
 
+    // ===== CREAR CUPÓN DE DESCUENTO EN SHOPIFY =====
+    let discountCode: string | null = null;
+    
+    try {
+      // Get discount config first
+      const config = await getDiscountConfig(merchantId);
+      
+      // Calcular el descuento basado en el tier
+      const discountValue = await calculateDiscount(merchantId, 1, discountTier); // Start with 1 member (owner)
+      
+      if (discountValue > 0) {
+        // Get discount type from config
+        const discountType = config?.discount_type || 'percentage';
+        
+        // Generate discount code (similar format to invite code but different prefix)
+        const discountCodePrefix = 'FF';
+        let generatedDiscountCode = `${discountCodePrefix}${inviteCode.substring(0, 6)}`;
+        
+        // Ensure uniqueness
+        let discountCodeAttempts = 0;
+        while (discountCodeAttempts < 10) {
+          const existing = await pool.query(
+            'SELECT id FROM ff_groups WHERE discount_code = $1',
+            [generatedDiscountCode]
+          );
+          if (existing.rows.length === 0) break;
+          generatedDiscountCode = `${discountCodePrefix}${generateInviteCode().substring(0, 6)}`;
+          discountCodeAttempts++;
+        }
+        
+        console.log('[createGroup] Creating discount code in Shopify:', {
+          code: generatedDiscountCode,
+          value: discountValue,
+          type: discountType,
+          tier: discountTier,
+        });
+        
+        // Create discount code in Shopify
+        const { discountCode: shopifyDiscountCode, error: discountError } = await createDiscountCode({
+          code: generatedDiscountCode,
+          value: discountValue,
+          valueType: discountType === 'percentage' ? 'percentage' : 'fixed_amount',
+          title: `Friends & Family: ${name}`,
+          customerSelection: 'all', // Can be restricted to specific customers later
+        });
+        
+        if (discountError) {
+          console.warn('[createGroup] Failed to create discount code in Shopify (continuing anyway):', discountError);
+        } else if (shopifyDiscountCode) {
+          discountCode = shopifyDiscountCode.code;
+          console.log('[createGroup] ✅ Discount code created in Shopify:', discountCode);
+        }
+      } else {
+        console.log('[createGroup] No discount configured, skipping discount code creation');
+      }
+    } catch (error) {
+      console.error('[createGroup] Error creating discount code (continuing anyway):', error);
+      // Continue with group creation even if discount code fails
+    }
+
+    // Verificar si existe columna discount_code
+    const discountCodeColumn = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ff_groups' AND column_name = 'discount_code'
+    `);
+    const hasDiscountCode = discountCodeColumn.rows.length > 0;
+
     // Construir query INSERT dinámicamente basado en columnas disponibles
     let insertColumns = ['merchant_id', 'name', 'owner_customer_id', 'owner_email', 'invite_code', 'max_members', 'current_members', 'discount_tier'];
     let insertValues: any[] = [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers, 1, discountTier];
@@ -74,6 +142,11 @@ export async function createGroup(
     if (hasOwnerUserId && ownerUserId) {
       insertColumns.push('owner_user_id');
       insertValues.push(ownerUserId);
+    }
+    
+    if (hasDiscountCode && discountCode) {
+      insertColumns.push('discount_code');
+      insertValues.push(discountCode);
     }
     
     const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');

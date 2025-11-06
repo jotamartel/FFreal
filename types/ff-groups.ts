@@ -8,6 +8,7 @@ export interface FFGroup {
   owner_email: string;
   owner_user_id?: string | null;
   invite_code: string;
+  discount_code?: string | null; // Shopify discount code
   max_members: number;
   current_members: number;
   status: 'active' | 'suspended' | 'terminated';
