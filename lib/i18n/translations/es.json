@@ -58,6 +58,11 @@
     "skipped": "Omitidos",
     "errors": "Errores",
     "unknownError": "Error desconocido ocurrió",
+    "groupSettings": "Configuración de Grupos",
+    "maxMembersPerGroup": "Máximo de Miembros por Grupo",
+    "maxMembersPerGroupHelp": "Si está configurado, este usuario podrá crear grupos con hasta este número de miembros. Si está vacío, se usará el valor por defecto de la configuración.",
+    "discountTierIdentifier": "Identificador de Nivel de Descuento",
+    "discountTierIdentifierHelp": "Identificador del nivel de descuento para grupos creados por este usuario (ej: '1', '2', 'basic', 'premium'). Se usa para determinar el porcentaje de descuento.",
     "roleOptions": {
       "all": "Todos",
       "customer": "Customer",

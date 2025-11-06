@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
         role, 
         is_active, 
         can_create_groups,
+        max_members_per_group,
+        discount_tier_identifier,
         shopify_customer_id,
         created_at, 
         updated_at, 

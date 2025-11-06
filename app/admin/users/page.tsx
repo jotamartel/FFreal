@@ -33,6 +33,8 @@ interface User {
   role: string;
   is_active: boolean;
   can_create_groups: boolean;
+  max_members_per_group?: number | null;
+  discount_tier_identifier?: string | null;
   shopify_customer_id: string | null;
   created_at: string;
   updated_at: string;
@@ -166,6 +168,8 @@ export default function UsersManagementPage() {
           const roleIndex = headers.indexOf('Role');
           const isActiveIndex = headers.indexOf('Is Active');
           const canCreateGroupsIndex = headers.indexOf('Can Create Groups');
+          const maxMembersPerGroupIndex = headers.indexOf('Max Members Per Group');
+          const discountTierIdentifierIndex = headers.indexOf('Discount Tier Identifier');
           const shopifyCustomerIdIndex = headers.indexOf('Shopify Customer ID');
 
           if (emailIndex >= 0 && values[emailIndex]) {
@@ -176,6 +180,8 @@ export default function UsersManagementPage() {
               role: roleIndex >= 0 ? values[roleIndex] : 'customer',
               is_active: isActiveIndex >= 0 ? values[isActiveIndex] === 'true' : true,
               can_create_groups: canCreateGroupsIndex >= 0 ? values[canCreateGroupsIndex] === 'true' : false,
+              max_members_per_group: maxMembersPerGroupIndex >= 0 && values[maxMembersPerGroupIndex] ? parseInt(values[maxMembersPerGroupIndex]) || null : null,
+              discount_tier_identifier: discountTierIdentifierIndex >= 0 ? values[discountTierIdentifierIndex] || null : null,
               shopify_customer_id: shopifyCustomerIdIndex >= 0 ? values[shopifyCustomerIdIndex] : null,
             });
           }
@@ -244,6 +250,41 @@ export default function UsersManagementPage() {
     } catch (err: any) {
       console.error('Error updating permission:', err);
       setError('Error al actualizar permiso');
+    } finally {
+      setSaving(prev => {
+        const newState = { ...prev };
+        delete newState[userId];
+        return newState;
+      });
+    }
+  };
+
+  const handleUpdateField = async (userId: string, field: string, value: any) => {
+    try {
+      setSaving(prev => ({ ...prev, [userId]: true }));
+      setError(null);
+      setSuccess(null);
+
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          [field]: value,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(`Campo actualizado exitosamente`);
+        setTimeout(() => setSuccess(null), 3000);
+        await loadUsers();
+      } else {
+        setError(data.error || `Error al actualizar ${field}`);
+      }
+    } catch (err: any) {
+      console.error(`Error updating ${field}:`, err);
+      setError(`Error al actualizar ${field}`);
     } finally {
       setSaving(prev => {
         const newState = { ...prev };
@@ -432,6 +473,37 @@ export default function UsersManagementPage() {
                             {user.is_active ? t('analytics.active') : t('analytics.inactive')}
                           </Badge>
                         </InlineStack>
+                        
+                        {user.can_create_groups && (
+                          <BlockStack gap="300">
+                            <Text as="p" variant="bodyMd">
+                              <strong>{t('users.groupSettings')}</strong>
+                            </Text>
+                            <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
+                              <TextField
+                                label={t('users.maxMembersPerGroup')}
+                                value={user.max_members_per_group?.toString() || ''}
+                                onChange={(value) => {
+                                  const numValue = value === '' ? null : parseInt(value) || null;
+                                  handleUpdateField(user.id, 'max_members_per_group', numValue);
+                                }}
+                                type="number"
+                                min={1}
+                                disabled={saving[user.id]}
+                                helpText={t('users.maxMembersPerGroupHelp')}
+                              />
+                              <TextField
+                                label={t('users.discountTierIdentifier')}
+                                value={user.discount_tier_identifier || ''}
+                                onChange={(value) => {
+                                  handleUpdateField(user.id, 'discount_tier_identifier', value || null);
+                                }}
+                                disabled={saving[user.id]}
+                                helpText={t('users.discountTierIdentifierHelp')}
+                              />
+                            </InlineGrid>
+                          </BlockStack>
+                        )}
                         
                         <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
                           <BlockStack gap="200">

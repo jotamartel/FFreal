@@ -35,7 +35,7 @@ export async function createGroup(
   params: CreateGroupParams & { ownerUserId?: string }
 ): Promise<FFGroup | null> {
   try {
-    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6, ownerUserId } = params;
+    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6, discountTier = 1, ownerUserId } = params;
     
     // Verificar qué columnas existen
     const groupsColumns = await pool.query(`
@@ -66,8 +66,8 @@ export async function createGroup(
     }
 
     // Construir query INSERT dinámicamente basado en columnas disponibles
-    let insertColumns = ['merchant_id', 'name', 'owner_customer_id', 'owner_email', 'invite_code', 'max_members', 'current_members'];
-    let insertValues: any[] = [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers, 1];
+    let insertColumns = ['merchant_id', 'name', 'owner_customer_id', 'owner_email', 'invite_code', 'max_members', 'current_members', 'discount_tier'];
+    let insertValues: any[] = [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers, 1, discountTier];
     
     if (hasOwnerUserId && ownerUserId) {
       insertColumns.push('owner_user_id');

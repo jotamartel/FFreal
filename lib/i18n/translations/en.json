@@ -58,6 +58,11 @@
     "skipped": "Skipped",
     "errors": "Errors",
     "unknownError": "Unknown error occurred",
+    "groupSettings": "Group Settings",
+    "maxMembersPerGroup": "Max Members Per Group",
+    "maxMembersPerGroupHelp": "If set, this user can create groups with up to this many members. If empty, the default value from configuration will be used.",
+    "discountTierIdentifier": "Discount Tier Identifier",
+    "discountTierIdentifierHelp": "Discount tier identifier for groups created by this user (e.g., '1', '2', 'basic', 'premium'). Used to determine discount percentage.",
     "roleOptions": {
       "all": "All",
       "customer": "Customer",

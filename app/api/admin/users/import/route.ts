@@ -14,6 +14,8 @@ interface ImportUser {
   role?: string;
   is_active?: boolean;
   can_create_groups?: boolean;
+  max_members_per_group?: number | null;
+  discount_tier_identifier?: string | null;
   shopify_customer_id?: string | null;
   password?: string; // Optional, only if creating new user
 }
@@ -101,6 +103,14 @@ export async function POST(request: NextRequest) {
             updateFields.push(`can_create_groups = $${paramIndex++}`);
             updateValues.push(user.can_create_groups);
           }
+          if (user.max_members_per_group !== undefined) {
+            updateFields.push(`max_members_per_group = $${paramIndex++}`);
+            updateValues.push(user.max_members_per_group);
+          }
+          if (user.discount_tier_identifier !== undefined) {
+            updateFields.push(`discount_tier_identifier = $${paramIndex++}`);
+            updateValues.push(user.discount_tier_identifier || null);
+          }
           if (user.shopify_customer_id !== undefined) {
             updateFields.push(`shopify_customer_id = $${paramIndex++}`);
             updateValues.push(user.shopify_customer_id || null);
@@ -124,6 +134,8 @@ export async function POST(request: NextRequest) {
           const role = user.role || 'customer';
           const isActive = user.is_active !== undefined ? user.is_active : true;
           const canCreateGroups = user.can_create_groups !== undefined ? user.can_create_groups : false;
+          const maxMembersPerGroup = user.max_members_per_group !== undefined ? user.max_members_per_group : null;
+          const discountTierIdentifier = user.discount_tier_identifier !== undefined ? user.discount_tier_identifier : null;
 
           // Generate a default password if not provided
           let passwordHash: string;
@@ -139,8 +151,8 @@ export async function POST(request: NextRequest) {
 
           const insertResult = await pool.query(
             `INSERT INTO users 
-             (email, name, phone, role, password_hash, is_active, can_create_groups, shopify_customer_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             (email, name, phone, role, password_hash, is_active, can_create_groups, max_members_per_group, discount_tier_identifier, shopify_customer_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING id`,
             [
               user.email,
@@ -150,6 +162,8 @@ export async function POST(request: NextRequest) {
               passwordHash,
               isActive,
               canCreateGroups,
+              maxMembersPerGroup,
+              discountTierIdentifier,
               user.shopify_customer_id || null,
             ]
           );

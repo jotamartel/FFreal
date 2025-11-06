@@ -15,7 +15,7 @@ export async function PATCH(
   try {
     const userId = params.id;
     const body = await request.json();
-    const { can_create_groups, is_active } = body;
+    const { can_create_groups, is_active, max_members_per_group, discount_tier_identifier } = body;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -31,6 +31,16 @@ export async function PATCH(
       values.push(is_active);
     }
 
+    if (max_members_per_group !== undefined) {
+      updates.push(`max_members_per_group = $${paramCount++}`);
+      values.push(max_members_per_group);
+    }
+
+    if (discount_tier_identifier !== undefined) {
+      updates.push(`discount_tier_identifier = $${paramCount++}`);
+      values.push(discount_tier_identifier);
+    }
+
     if (updates.length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -44,7 +54,7 @@ export async function PATCH(
       `UPDATE users 
        SET ${updates.join(', ')}, updated_at = NOW()
        WHERE id = $${paramCount}
-       RETURNING id, email, name, role, is_active, can_create_groups, created_at, updated_at`,
+       RETURNING id, email, name, role, is_active, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at`,
       values
     );
 
@@ -87,6 +97,8 @@ export async function GET(
         role, 
         is_active, 
         can_create_groups,
+        max_members_per_group,
+        discount_tier_identifier,
         shopify_customer_id,
         created_at, 
         updated_at, 

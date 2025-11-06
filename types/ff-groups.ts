@@ -82,6 +82,7 @@ export interface CreateGroupParams {
   ownerCustomerId: string;
   ownerEmail: string;
   maxMembers?: number;
+  discountTier?: number;
 }
 
 export interface CreateInvitationParams {

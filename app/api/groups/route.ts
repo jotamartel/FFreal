@@ -100,9 +100,17 @@ export async function POST(request: NextRequest) {
     // Use default merchantId if not provided (for single-tenant apps)
     const finalMerchantId = merchantId || 'default';
     
-    // Get max_members from configuration (admin-controlled, not user input)
+    // Get max_members: prioritize user's setting, then config default, then 6
     const config = await getDiscountConfig(finalMerchantId);
-    const finalMaxMembers = config?.max_members_default || 6;
+    const finalMaxMembers = user.max_members_per_group ?? config?.max_members_default ?? 6;
+    
+    // Get discount_tier: use user's discount_tier_identifier if set, otherwise default to 1
+    // If discount_tier_identifier is a number string, parse it; otherwise use as-is
+    let discountTier = 1;
+    if (user.discount_tier_identifier) {
+      const parsed = parseInt(user.discount_tier_identifier);
+      discountTier = isNaN(parsed) ? 1 : parsed;
+    }
 
     const group = await createGroup({
       merchantId: finalMerchantId,
@@ -110,6 +118,7 @@ export async function POST(request: NextRequest) {
       ownerCustomerId: user.shopify_customer_id || user.id,
       ownerEmail: user.email,
       maxMembers: finalMaxMembers,
+      discountTier,
       ownerUserId: user.id, // Vincular user_id
     });
 
