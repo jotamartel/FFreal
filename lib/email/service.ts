@@ -48,6 +48,18 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
     if (result.error) {
       console.error('[EMAIL] Resend API error:', result.error);
+      
+      // Check for specific error types and provide user-friendly messages
+      const error = result.error as any;
+      if (error.statusCode === 403 && error.name === 'validation_error') {
+        // This is the "test domain" error - provide helpful message
+        return { 
+          success: false, 
+          error: 'DOMAIN_NOT_VERIFIED',
+          message: 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada, pero el email no pudo ser enviado. Puedes compartir el código de invitación manualmente.'
+        };
+      }
+      
       return { success: false, error: JSON.stringify(result.error) };
     }
 
@@ -128,6 +140,8 @@ export async function sendInvitationEmail(
 
   if (!result.success) {
     console.error('[EMAIL] Failed to send invitation email:', result.error);
+    // Return the error details for better error handling
+    throw new Error(result.error === 'DOMAIN_NOT_VERIFIED' ? result.message || 'Domain not verified' : result.error || 'Failed to send email');
   }
 
   return result.success;

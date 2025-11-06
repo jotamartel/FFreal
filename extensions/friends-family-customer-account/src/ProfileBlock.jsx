@@ -241,12 +241,27 @@ function FriendsFamilyBlock() {
       const data = await response.json();
 
       if (response.ok && data.invitation) {
-        setInviteSuccess(true);
-        setInviteEmail('');
-        setTimeout(() => {
-          setInviteSuccess(false);
-          setShowInviteForm(false);
-        }, 3000);
+        // Check if email was sent successfully
+        if (data.emailSent) {
+          setInviteSuccess(true);
+          setInviteEmail('');
+          setTimeout(() => {
+            setInviteSuccess(false);
+            setShowInviteForm(false);
+          }, 3000);
+        } else {
+          // Invitation was created but email failed
+          // Show a warning with the invite code
+          const errorMsg = data.emailError || 'El email no pudo ser enviado, pero la invitación fue creada.';
+          setInviteError(errorMsg);
+          // Still show success for invitation creation, but with warning
+          setInviteSuccess(true);
+          setTimeout(() => {
+            setInviteSuccess(false);
+            setShowInviteForm(false);
+            setInviteError(null);
+          }, 5000); // Show longer to read the message
+        }
       } else {
         setInviteError(data.error || 'Error al enviar la invitación');
       }
@@ -456,13 +471,20 @@ function FriendsFamilyBlock() {
             <s-stack direction="block" gap="base">
               <s-heading>Invitar a un miembro</s-heading>
               
-              {inviteSuccess && (
+              {inviteSuccess && !inviteError && (
                 <s-banner tone="success">
                   <s-text>¡Invitación enviada exitosamente!</s-text>
                 </s-banner>
               )}
               
-              {inviteError && (
+              {inviteSuccess && inviteError && (
+                <s-banner tone="warning">
+                  <s-text>Invitación creada, pero el email no pudo ser enviado:</s-text>
+                  <s-text>{inviteError}</s-text>
+                </s-banner>
+              )}
+              
+              {!inviteSuccess && inviteError && (
                 <s-banner tone="critical">
                   <s-text>{inviteError}</s-text>
                 </s-banner>
