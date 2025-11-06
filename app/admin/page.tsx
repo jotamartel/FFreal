@@ -56,6 +56,21 @@ export default function AdminDashboard() {
                   </Card>
                 </div>
                 <div
+                  onClick={() => router.push(getRoute('/admin/users'))}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Card>
+                    <BlockStack gap="200">
+                      <Text as="h3" variant="headingSm">
+                        Users
+                      </Text>
+                      <Text as="p" variant="bodyMd" tone="subdued">
+                        Manage user permissions and access
+                      </Text>
+                    </BlockStack>
+                  </Card>
+                </div>
+                <div
                   onClick={() => router.push(getRoute('/admin/config'))}
                   style={{ cursor: 'pointer' }}
                 >
