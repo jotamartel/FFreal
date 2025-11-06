@@ -20,23 +20,45 @@ const authRoutes = ['/login'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const method = request.method;
+
+  // Log all requests for debugging
+  console.log('[Middleware] Request:', {
+    method,
+    pathname,
+    url: request.url,
+  });
 
   // Handle CORS preflight requests for API routes FIRST
   // This must be checked before any other logic
-  if (request.method === 'OPTIONS') {
+  if (method === 'OPTIONS') {
+    console.log('[Middleware] ✅ OPTIONS request detected for:', pathname);
     if (pathname.startsWith('/api/')) {
-      console.log('[Middleware] Handling OPTIONS preflight for:', pathname);
-      return new NextResponse(null, {
+      console.log('[Middleware] ✅ Handling OPTIONS preflight for API route:', pathname);
+      const origin = request.headers.get('origin') || '*';
+      console.log('[Middleware] Origin:', origin);
+      
+      const response = new NextResponse(null, {
         status: 200,
         headers: {
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': origin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           'Access-Control-Max-Age': '86400',
+          'Access-Control-Allow-Credentials': 'true',
         },
       });
+      
+      console.log('[Middleware] OPTIONS response headers:', {
+        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+      });
+      
+      return response;
     }
     // For non-API OPTIONS, just pass through
+    console.log('[Middleware] OPTIONS request for non-API route, passing through');
     return NextResponse.next();
   }
 
