@@ -107,6 +107,115 @@ export default function UsersManagementPage() {
     loadUsers();
   }, [loadUsers]);
 
+  const handleExport = async (format: 'json' | 'csv' = 'json') => {
+    setExporting(true);
+    try {
+      const url = `/api/admin/users/export?format=${format}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to export');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `users-export-${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Error exporting:', error);
+      setError('Error exporting users. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportFile = async () => {
+    if (!importFile) {
+      setError('Please select a file');
+      return;
+    }
+
+    setImporting(true);
+    setImportResult(null);
+    setError(null);
+
+    try {
+      const text = await importFile.text();
+      let data;
+
+      if (importFile.name.endsWith('.json')) {
+        data = JSON.parse(text);
+      } else if (importFile.name.endsWith('.csv')) {
+        // Simple CSV parsing (basic implementation)
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const users: any[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+          
+          const emailIndex = headers.indexOf('Email');
+          const nameIndex = headers.indexOf('Name');
+          const phoneIndex = headers.indexOf('Phone');
+          const roleIndex = headers.indexOf('Role');
+          const isActiveIndex = headers.indexOf('Is Active');
+          const canCreateGroupsIndex = headers.indexOf('Can Create Groups');
+          const shopifyCustomerIdIndex = headers.indexOf('Shopify Customer ID');
+
+          if (emailIndex >= 0 && values[emailIndex]) {
+            users.push({
+              email: values[emailIndex],
+              name: nameIndex >= 0 ? values[nameIndex] : null,
+              phone: phoneIndex >= 0 ? values[phoneIndex] : null,
+              role: roleIndex >= 0 ? values[roleIndex] : 'customer',
+              is_active: isActiveIndex >= 0 ? values[isActiveIndex] === 'true' : true,
+              can_create_groups: canCreateGroupsIndex >= 0 ? values[canCreateGroupsIndex] === 'true' : false,
+              shopify_customer_id: shopifyCustomerIdIndex >= 0 ? values[shopifyCustomerIdIndex] : null,
+            });
+          }
+        }
+
+        data = { users };
+      } else {
+        throw new Error('Unsupported file format. Please use JSON or CSV.');
+      }
+
+      const response = await fetch('/api/admin/users/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          users: data.users || data,
+          mode: importMode,
+        }),
+      });
+
+      const result = await response.json();
+      setImportResult(result);
+
+      if (result.success) {
+        // Reload users after successful import
+        setTimeout(() => {
+          loadUsers();
+          setShowImportModal(false);
+        }, 2000);
+      } else {
+        setError(result.error || 'Import failed');
+      }
+    } catch (error: any) {
+      console.error('Error importing:', error);
+      setError(error.message || 'Error importing users. Please check the file format.');
+      setImportResult({ success: false, error: error.message });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleTogglePermission = async (userId: string, currentValue: boolean) => {
     try {
       setSaving(prev => ({ ...prev, [userId]: true }));
