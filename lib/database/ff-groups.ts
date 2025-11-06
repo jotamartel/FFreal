@@ -12,6 +12,8 @@ import {
   UpdateMemberParams,
   UpdateDiscountConfigParams,
 } from '@/types/ff-groups';
+import { getOrCreateShopifyCustomer } from '@/lib/shopify/admin';
+import { createUser, getUserByEmail, updateUser, findOrCreateUserByShopifyCustomerId } from './users';
 import crypto from 'crypto';
 
 /**
@@ -516,6 +518,7 @@ export async function getInvitationByToken(token: string): Promise<FFInvitation 
 
 /**
  * Aceptar invitación
+ * Automáticamente crea el cliente en Shopify y vincula las cuentas
  */
 export async function acceptInvitation(
   token: string,
@@ -548,15 +551,80 @@ export async function acceptInvitation(
       return null;
     }
 
+    // ===== CREAR CLIENTE EN SHOPIFY Y VINCULAR CUENTAS =====
+    let finalShopifyCustomerId: string | null = customerId || null;
+    let finalUserId: string | null = userId || null;
+
+    // 1. Crear o encontrar cliente en Shopify
+    console.log('[acceptInvitation] Creating/finding Shopify customer for:', invitation.email);
+    const { customerId: shopifyCustomerId, error: shopifyError } = await getOrCreateShopifyCustomer({
+      email: invitation.email,
+      acceptsMarketing: false,
+      tags: ['friends-family', `group-${group.id}`],
+      note: `Miembro del grupo Friends & Family: ${group.name}`,
+    });
+
+    if (shopifyError) {
+      console.warn('[acceptInvitation] Shopify customer creation failed (continuing anyway):', shopifyError);
+    } else if (shopifyCustomerId) {
+      finalShopifyCustomerId = shopifyCustomerId;
+      console.log('[acceptInvitation] ✅ Shopify customer created/found:', shopifyCustomerId);
+    }
+
+    // 2. Crear o encontrar usuario en la app y vincular con Shopify
+    if (finalShopifyCustomerId) {
+      // Buscar usuario existente por email
+      let appUser = await getUserByEmail(invitation.email);
+      
+      if (appUser) {
+        // Usuario existe: actualizar con shopify_customer_id si no lo tiene
+        if (!appUser.shopify_customer_id) {
+          await updateUser(appUser.id, { 
+            // Note: updateUser doesn't support shopify_customer_id, so we'll do it directly
+          });
+          await pool.query(
+            'UPDATE users SET shopify_customer_id = $1, updated_at = NOW() WHERE id = $2',
+            [finalShopifyCustomerId, appUser.id]
+          );
+          appUser = { ...appUser, shopify_customer_id: finalShopifyCustomerId };
+        }
+        finalUserId = appUser.id;
+        console.log('[acceptInvitation] ✅ Linked existing app user to Shopify customer');
+      } else {
+        // Usuario no existe: crear uno básico vinculado a Shopify
+        // El usuario puede completar su registro más tarde
+        const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        appUser = await createUser({
+          email: invitation.email,
+          password: tempPassword,
+          role: 'customer',
+          shopify_customer_id: finalShopifyCustomerId,
+        });
+        
+        if (appUser) {
+          finalUserId = appUser.id;
+          console.log('[acceptInvitation] ✅ Created new app user linked to Shopify customer');
+        }
+      }
+    } else if (userId) {
+      // Si no hay Shopify customer pero hay userId, usar ese
+      finalUserId = userId;
+    }
+
     // Crear o actualizar miembro
     let member = await getMemberByEmailAndGroup(invitation.email, invitation.group_id);
     
     if (member) {
-      // Actualizar miembro existente (agregar user_id si no tiene)
-      if (userId && !member.user_id) {
+      // Actualizar miembro existente
+      if (finalUserId && !member.user_id) {
         await pool.query(
-          'UPDATE ff_group_members SET user_id = $1 WHERE id = $2',
-          [userId, member.id]
+          'UPDATE ff_group_members SET user_id = $1, customer_id = $2 WHERE id = $3',
+          [finalUserId, finalShopifyCustomerId, member.id]
+        );
+      } else if (finalShopifyCustomerId && !member.customer_id) {
+        await pool.query(
+          'UPDATE ff_group_members SET customer_id = $1 WHERE id = $2',
+          [finalShopifyCustomerId, member.id]
         );
       }
       
@@ -566,7 +634,7 @@ export async function acceptInvitation(
         emailVerified: true,
       });
     } else {
-      // Crear nuevo miembro (con user_id si está disponible)
+      // Crear nuevo miembro
       const verificationToken = generateVerificationToken();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
@@ -576,7 +644,7 @@ export async function acceptInvitation(
          (group_id, customer_id, user_id, email, role, status, email_verified, verification_token, verification_expires_at, joined_at)
          VALUES ($1, $2, $3, $4, 'member', 'active', true, $5, $6, NOW())
          RETURNING *`,
-        [invitation.group_id, customerId || null, userId || null, invitation.email, verificationToken, expiresAt]
+        [invitation.group_id, finalShopifyCustomerId, finalUserId, invitation.email, verificationToken, expiresAt]
       );
       
       member = memberResult.rows[0] as FFGroupMember;
@@ -597,6 +665,7 @@ export async function acceptInvitation(
 
 /**
  * Unirse a un grupo usando el código de invitación
+ * Automáticamente crea el cliente en Shopify y vincula las cuentas
  */
 export async function joinGroupByCode(
   inviteCode: string,
@@ -622,6 +691,62 @@ export async function joinGroupByCode(
       return null; // Ya es miembro activo
     }
 
+    // ===== CREAR CLIENTE EN SHOPIFY Y VINCULAR CUENTAS =====
+    let finalShopifyCustomerId: string | null = customerId || null;
+    let finalUserId: string | null = userId || null;
+
+    // 1. Crear o encontrar cliente en Shopify
+    console.log('[joinGroupByCode] Creating/finding Shopify customer for:', email);
+    const { customerId: shopifyCustomerId, error: shopifyError } = await getOrCreateShopifyCustomer({
+      email: email,
+      acceptsMarketing: false,
+      tags: ['friends-family', `group-${group.id}`],
+      note: `Miembro del grupo Friends & Family: ${group.name}`,
+    });
+
+    if (shopifyError) {
+      console.warn('[joinGroupByCode] Shopify customer creation failed (continuing anyway):', shopifyError);
+    } else if (shopifyCustomerId) {
+      finalShopifyCustomerId = shopifyCustomerId;
+      console.log('[joinGroupByCode] ✅ Shopify customer created/found:', shopifyCustomerId);
+    }
+
+    // 2. Crear o encontrar usuario en la app y vincular con Shopify
+    if (finalShopifyCustomerId) {
+      // Buscar usuario existente por email
+      let appUser = await getUserByEmail(email);
+      
+      if (appUser) {
+        // Usuario existe: actualizar con shopify_customer_id si no lo tiene
+        if (!appUser.shopify_customer_id) {
+          await pool.query(
+            'UPDATE users SET shopify_customer_id = $1, updated_at = NOW() WHERE id = $2',
+            [finalShopifyCustomerId, appUser.id]
+          );
+          appUser = { ...appUser, shopify_customer_id: finalShopifyCustomerId };
+        }
+        finalUserId = appUser.id;
+        console.log('[joinGroupByCode] ✅ Linked existing app user to Shopify customer');
+      } else {
+        // Usuario no existe: crear uno básico vinculado a Shopify
+        const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        appUser = await createUser({
+          email: email,
+          password: tempPassword,
+          role: 'customer',
+          shopify_customer_id: finalShopifyCustomerId,
+        });
+        
+        if (appUser) {
+          finalUserId = appUser.id;
+          console.log('[joinGroupByCode] ✅ Created new app user linked to Shopify customer');
+        }
+      }
+    } else if (userId) {
+      // Si no hay Shopify customer pero hay userId, usar ese
+      finalUserId = userId;
+    }
+
     // Verificar columnas disponibles
     const membersColumns = await pool.query(`
       SELECT column_name 
@@ -636,10 +761,15 @@ export async function joinGroupByCode(
 
     if (existingMember) {
       // Actualizar miembro existente
-      if (userId && hasMemberUserId) {
+      if (finalUserId && hasMemberUserId) {
         await pool.query(
-          'UPDATE ff_group_members SET user_id = $1, status = $2, email_verified = $3, joined_at = NOW() WHERE id = $4',
-          [userId, 'active', true, existingMember.id]
+          'UPDATE ff_group_members SET user_id = $1, customer_id = $2, status = $3, email_verified = $4, joined_at = NOW() WHERE id = $5',
+          [finalUserId, finalShopifyCustomerId, 'active', true, existingMember.id]
+        );
+      } else if (finalShopifyCustomerId && !existingMember.customer_id) {
+        await pool.query(
+          'UPDATE ff_group_members SET customer_id = $1, status = $2, email_verified = $3, joined_at = NOW() WHERE id = $4',
+          [finalShopifyCustomerId, 'active', true, existingMember.id]
         );
       } else {
         await pool.query(
@@ -652,13 +782,13 @@ export async function joinGroupByCode(
     } else {
       // Crear nuevo miembro
       isNewMember = true;
-      if (hasMemberUserId && userId) {
+      if (hasMemberUserId && finalUserId) {
         const result = await pool.query(
           `INSERT INTO ff_group_members 
            (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
            VALUES ($1, $2, $3, $4, 'member', 'active', true, NOW())
            RETURNING *`,
-          [group.id, customerId || null, userId, email]
+          [group.id, finalShopifyCustomerId, finalUserId, email]
         );
         member = result.rows[0] as FFGroupMember;
       } else {
@@ -667,7 +797,7 @@ export async function joinGroupByCode(
            (group_id, customer_id, email, role, status, email_verified, joined_at)
            VALUES ($1, $2, $3, 'member', 'active', true, NOW())
            RETURNING *`,
-          [group.id, customerId || null, email]
+          [group.id, finalShopifyCustomerId, email]
         );
         member = result.rows[0] as FFGroupMember;
       }
