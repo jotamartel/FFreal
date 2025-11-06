@@ -54,6 +54,8 @@ export interface FFDiscountConfig {
   rules: DiscountRules;
   max_groups_per_email: number;
   cooling_period_days: number;
+  max_members_default?: number;
+  invite_redirect_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -109,5 +111,7 @@ export interface UpdateDiscountConfigParams {
   rules?: DiscountRules;
   maxGroupsPerEmail?: number;
   coolingPeriodDays?: number;
+  maxMembersDefault?: number;
+  inviteRedirectUrl?: string;
 }
 

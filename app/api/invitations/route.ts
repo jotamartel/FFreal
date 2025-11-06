@@ -39,12 +39,18 @@ export async function POST(request: NextRequest) {
     try {
       const group = await getGroupById(groupId);
       if (group) {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const inviteLink = `${baseUrl}/customer/invitations/${invitation.token}`;
+        // Get redirect URL from config, or use default
+        const { getDiscountConfig } = await import('@/lib/database/ff-groups');
+        const config = await getDiscountConfig('default');
+        const baseUrl = config?.invite_redirect_url || process.env.NEXT_PUBLIC_APP_URL || 'https://shopify-friends-family-app.vercel.app';
+        
+        // Use invite_code instead of token - redirects to invitation page with code pre-filled
+        const inviteLink = `${baseUrl}/tienda/unirse?code=${group.invite_code}`;
         
         console.log('[INVITATION] Sending invitation email:', {
           email,
           groupName: group.name,
+          inviteCode: group.invite_code,
           inviteLink,
           hasResendKey: !!process.env.RESEND_API_KEY,
         });
@@ -52,7 +58,8 @@ export async function POST(request: NextRequest) {
         emailSent = await sendInvitationEmail(
           email,
           group.name,
-          inviteLink
+          inviteLink,
+          group.invite_code
         );
 
         if (!emailSent) {

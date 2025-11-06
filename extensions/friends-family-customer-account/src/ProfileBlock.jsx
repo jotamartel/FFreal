@@ -10,17 +10,59 @@ function FriendsFamilyBlock() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [canCreateGroups, setCanCreateGroups] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [createGroupError, setCreateGroupError] = useState(null);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningGroup, setJoiningGroup] = useState(false);
   
   // Form state
   const [groupName, setGroupName] = useState('');
-  const [maxMembers, setMaxMembers] = useState('6');
 
   useEffect(() => {
+    fetchPermissions();
     fetchGroups();
   }, []);
+
+  async function fetchPermissions() {
+    try {
+      const sessionToken = await shopify.sessionToken.get();
+      const authenticatedAccount = shopify.authenticatedAccount;
+      const customer = authenticatedAccount?.customer?.value;
+      
+      const appUrl = 'https://shopify-friends-family-app.vercel.app';
+      let apiUrl = `${appUrl}/api/customer/permissions`;
+      
+      if (customer?.id) {
+        const customerIdMatch = customer.id.match(/Customer\/(\d+)/);
+        if (customerIdMatch && customerIdMatch[1]) {
+          apiUrl += `?customerId=${customerIdMatch[1]}`;
+        }
+      }
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCanCreateGroups(data.canCreateGroups === true);
+        console.log('[ProfileBlock] User can create groups:', data.canCreateGroups);
+      } else {
+        console.warn('[ProfileBlock] Could not fetch permissions, defaulting to false');
+        setCanCreateGroups(false);
+      }
+    } catch (err) {
+      console.error('[ProfileBlock] Error fetching permissions:', err);
+      setCanCreateGroups(false);
+    }
+  }
 
   async function fetchGroups() {
     try {
@@ -145,12 +187,6 @@ function FriendsFamilyBlock() {
         return;
       }
       
-      const maxMembersNum = parseInt(maxMembers, 10);
-      if (isNaN(maxMembersNum) || maxMembersNum < 2 || maxMembersNum > 20) {
-        setCreateGroupError('El máximo de miembros debe ser entre 2 y 20');
-        return;
-      }
-      
       // Get session token
       const sessionToken = await shopify.sessionToken.get();
       const authenticatedAccount = shopify.authenticatedAccount;
@@ -176,8 +212,8 @@ function FriendsFamilyBlock() {
         credentials: 'include',
         body: JSON.stringify({
           name: groupName.trim(),
-          max_members: maxMembersNum,
           merchantId: 'default',
+          // max_members is now controlled by admin config, not user input
         }),
       });
       
@@ -199,7 +235,6 @@ function FriendsFamilyBlock() {
       // Close form and reset
       setShowCreateForm(false);
       setGroupName('');
-      setMaxMembers('6');
       
       // Refresh groups list
       await fetchGroups();
@@ -211,76 +246,137 @@ function FriendsFamilyBlock() {
     }
   }
 
+  async function joinGroupByCode() {
+    if (!inviteCode.trim()) {
+      setError('Por favor ingresa un código de invitación');
+      return;
+    }
+
+    setJoiningGroup(true);
+    setError(null);
+
+    try {
+      const sessionToken = await shopify.sessionToken.get();
+      const appUrl = 'https://shopify-friends-family-app.vercel.app';
+      
+      const response = await fetch(`${appUrl}/api/invitations/join-by-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          inviteCode: inviteCode.trim().toUpperCase(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.member) {
+        setInviteCode('');
+        await fetchGroups();
+      } else {
+        setError(data.error || 'Error al unirse al grupo');
+      }
+    } catch (err) {
+      console.error('[ProfileBlock] Error joining group:', err);
+      setError('Error al unirse al grupo. Intenta de nuevo.');
+    } finally {
+      setJoiningGroup(false);
+    }
+  }
+
   if (groups.length === 0) {
     return (
       <s-section heading="Friends & Family">
         <s-stack direction="block" gap="base">
           <s-text>No tienes grupos activos de Friends & Family.</s-text>
           
-          {!showCreateForm ? (
-            <s-button 
-              variant="primary" 
-              onClick={() => {
-                console.log('[ProfileBlock] Button clicked, showing form');
-                setShowCreateForm(true);
-              }}
-            >
-              Crear un grupo
-            </s-button>
+          {canCreateGroups ? (
+            // User can create groups - show create form
+            !showCreateForm ? (
+              <s-button 
+                variant="primary" 
+                onClick={() => {
+                  console.log('[ProfileBlock] Button clicked, showing form');
+                  setShowCreateForm(true);
+                }}
+              >
+                Crear un grupo
+              </s-button>
+            ) : (
+              <s-section>
+                <s-stack direction="block" gap="base">
+                  <s-heading>Crear Grupo Friends & Family</s-heading>
+                  
+                  {createGroupError && (
+                    <s-banner tone="critical">
+                      <s-text>{createGroupError}</s-text>
+                    </s-banner>
+                  )}
+                  
+                  <s-text-field
+                    label="Nombre del Grupo"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="Ej: Mi Familia"
+                    disabled={creatingGroup}
+                  />
+                  
+                  <s-stack direction="inline" gap="base" alignment="end">
+                    <s-button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setCreateGroupError(null);
+                        setGroupName('');
+                      }}
+                      disabled={creatingGroup}
+                    >
+                      Cancelar
+                    </s-button>
+                    <s-button
+                      variant="primary"
+                      onClick={createGroup}
+                      loading={creatingGroup}
+                    >
+                      Crear Grupo
+                    </s-button>
+                  </s-stack>
+                </s-stack>
+              </s-section>
+            )
           ) : (
+            // User cannot create groups - only show join by code
             <s-section>
               <s-stack direction="block" gap="base">
-                <s-heading>Crear Grupo Friends & Family</s-heading>
+                <s-heading>Unirse a un Grupo</s-heading>
+                <s-text appearance="subdued">
+                  Ingresa el código de invitación que recibiste por email para unirte a un grupo de Friends & Family.
+                </s-text>
                 
-                {createGroupError && (
+                {error && (
                   <s-banner tone="critical">
-                    <s-text>{createGroupError}</s-text>
+                    <s-text>{error}</s-text>
                   </s-banner>
                 )}
                 
                 <s-text-field
-                  label="Nombre del Grupo"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Ej: Mi Familia"
-                  disabled={creatingGroup}
+                  label="Código de Invitación"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="Ej: ABC12345"
+                  disabled={joiningGroup}
                 />
                 
-                <s-text-field
-                  type="number"
-                  label="Máximo de Miembros"
-                  value={maxMembers}
-                  onChange={(e) => setMaxMembers(e.target.value)}
-                  min="2"
-                  max="20"
-                  disabled={creatingGroup}
-                />
-                
-                <s-text appearance="subdued">
-                  Máximo de personas que pueden unirse al grupo (incluyéndote)
-                </s-text>
-                
-                <s-stack direction="inline" gap="base" alignment="end">
-                  <s-button
-                    variant="secondary"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      setCreateGroupError(null);
-                      setGroupName('');
-                      setMaxMembers('6');
-                    }}
-                    disabled={creatingGroup}
-                  >
-                    Cancelar
-                  </s-button>
-                  <s-button
-                    variant="primary"
-                    onClick={createGroup}
-                    loading={creatingGroup}
-                  >
-                    Crear Grupo
-                  </s-button>
-                </s-stack>
+                <s-button
+                  variant="primary"
+                  onClick={joinGroupByCode}
+                  loading={joiningGroup}
+                >
+                  Unirse al Grupo
+                </s-button>
               </s-stack>
             </s-section>
           )}
@@ -334,70 +430,90 @@ function FriendsFamilyBlock() {
           </s-section>
         ))}
         
-        {!showCreateForm ? (
-          <s-button 
-            variant="primary" 
-            onClick={() => {
-              console.log('[ProfileBlock] Button clicked, showing form');
-              setShowCreateForm(true);
-            }}
-          >
-            Crear nuevo grupo
-          </s-button>
+        {canCreateGroups ? (
+          // User can create groups
+          !showCreateForm ? (
+            <s-button 
+              variant="primary" 
+              onClick={() => {
+                console.log('[ProfileBlock] Button clicked, showing form');
+                setShowCreateForm(true);
+              }}
+            >
+              Crear nuevo grupo
+            </s-button>
+          ) : (
+            <s-section>
+              <s-stack direction="block" gap="base">
+                <s-heading>Crear Grupo Friends & Family</s-heading>
+                
+                {createGroupError && (
+                  <s-banner tone="critical">
+                    <s-text>{createGroupError}</s-text>
+                  </s-banner>
+                )}
+                
+                <s-text-field
+                  label="Nombre del Grupo"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Ej: Mi Familia"
+                  disabled={creatingGroup}
+                />
+                
+                <s-stack direction="inline" gap="base" alignment="end">
+                  <s-button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setCreateGroupError(null);
+                      setGroupName('');
+                    }}
+                    disabled={creatingGroup}
+                  >
+                    Cancelar
+                  </s-button>
+                  <s-button
+                    variant="primary"
+                    onClick={createGroup}
+                    loading={creatingGroup}
+                  >
+                    Crear Grupo
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            </s-section>
+          )
         ) : (
+          // User cannot create groups - show join by code
           <s-section>
             <s-stack direction="block" gap="base">
-              <s-heading>Crear Grupo Friends & Family</s-heading>
+              <s-heading>Unirse a un Grupo</s-heading>
+              <s-text appearance="subdued">
+                Ingresa el código de invitación que recibiste por email para unirte a un grupo de Friends & Family.
+              </s-text>
               
-              {createGroupError && (
+              {error && (
                 <s-banner tone="critical">
-                  <s-text>{createGroupError}</s-text>
+                  <s-text>{error}</s-text>
                 </s-banner>
               )}
               
               <s-text-field
-                label="Nombre del Grupo"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Ej: Mi Familia"
-                disabled={creatingGroup}
+                label="Código de Invitación"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Ej: ABC12345"
+                disabled={joiningGroup}
               />
               
-              <s-text-field
-                type="number"
-                label="Máximo de Miembros"
-                value={maxMembers}
-                onChange={(e) => setMaxMembers(e.target.value)}
-                min="2"
-                max="20"
-                disabled={creatingGroup}
-              />
-              
-              <s-text appearance="subdued">
-                Máximo de personas que pueden unirse al grupo (incluyéndote)
-              </s-text>
-              
-              <s-stack direction="inline" gap="base" alignment="end">
-                <s-button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setCreateGroupError(null);
-                    setGroupName('');
-                    setMaxMembers('6');
-                  }}
-                  disabled={creatingGroup}
-                >
-                  Cancelar
-                </s-button>
-                <s-button
-                  variant="primary"
-                  onClick={createGroup}
-                  loading={creatingGroup}
-                >
-                  Crear Grupo
-                </s-button>
-              </s-stack>
+              <s-button
+                variant="primary"
+                onClick={joinGroupByCode}
+                loading={joiningGroup}
+              >
+                Unirse al Grupo
+              </s-button>
             </s-stack>
           </s-section>
         )}

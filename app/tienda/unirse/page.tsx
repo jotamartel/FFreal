@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Page,
   Card,
@@ -16,14 +17,28 @@ import { useRouter } from 'next/navigation';
 
 export default function JoinGroupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [group, setGroup] = useState<any>(null);
   const [joining, setJoining] = useState(false);
 
-  const handleSearch = async () => {
-    if (!inviteCode.trim()) {
+  // Auto-fill invite code from URL parameter
+  useEffect(() => {
+    const codeParam = searchParams.get('code');
+    if (codeParam) {
+      setInviteCode(codeParam.toUpperCase());
+      // Auto-search if code is provided
+      setTimeout(() => {
+        handleSearch(codeParam.toUpperCase());
+      }, 100);
+    }
+  }, [searchParams]);
+
+  const handleSearch = async (code?: string) => {
+    const codeToSearch = code || inviteCode.trim();
+    if (!codeToSearch) {
       setError('Por favor ingresa un código de invitación');
       return;
     }
@@ -33,7 +48,7 @@ export default function JoinGroupPage() {
     setGroup(null);
 
     try {
-      const response = await fetch(`/api/groups?inviteCode=${inviteCode.trim().toUpperCase()}`);
+      const response = await fetch(`/api/groups?inviteCode=${codeToSearch.toUpperCase()}`);
       const data = await response.json();
 
       if (response.ok && data.group) {

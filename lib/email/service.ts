@@ -78,7 +78,8 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 export async function sendInvitationEmail(
   email: string,
   groupName: string,
-  inviteLink: string
+  inviteLink: string,
+  inviteCode?: string
 ): Promise<boolean> {
   const html = `
     <!DOCTYPE html>
@@ -96,6 +97,12 @@ export async function sendInvitationEmail(
         <h2 style="color: #333; margin-top: 0;">You've been invited!</h2>
         <p>You've been invited to join <strong>${groupName}</strong>!</p>
         <p>Join this Friends & Family group to start saving together with exclusive discounts.</p>
+        ${inviteCode ? `
+        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0; color: #666; font-size: 14px;">Your invitation code:</p>
+          <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 2px;">${inviteCode}</p>
+        </div>
+        ` : ''}
         <div style="text-align: center; margin: 30px 0;">
           <a href="${inviteLink}" 
              style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">

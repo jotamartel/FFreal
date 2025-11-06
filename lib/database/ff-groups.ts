@@ -753,6 +753,14 @@ export async function upsertDiscountConfig(
         updates.push(`cooling_period_days = $${paramCount++}`);
         values.push(coolingPeriodDays);
       }
+      if (params.maxMembersDefault !== undefined) {
+        updates.push(`max_members_default = $${paramCount++}`);
+        values.push(params.maxMembersDefault);
+      }
+      if (params.inviteRedirectUrl !== undefined) {
+        updates.push(`invite_redirect_url = $${paramCount++}`);
+        values.push(params.inviteRedirectUrl);
+      }
 
       if (updates.length === 0) {
         return existing;
@@ -770,8 +778,8 @@ export async function upsertDiscountConfig(
       // Create
       const result = await pool.query(
         `INSERT INTO ff_discount_config 
-         (merchant_id, is_enabled, discount_type, tiers, rules, max_groups_per_email, cooling_period_days)
-         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7)
+         (merchant_id, is_enabled, discount_type, tiers, rules, max_groups_per_email, cooling_period_days, max_members_default, invite_redirect_url)
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
          RETURNING *`,
         [
           merchantId,
@@ -781,6 +789,8 @@ export async function upsertDiscountConfig(
           JSON.stringify(rules || {}),
           maxGroupsPerEmail ?? 1,
           coolingPeriodDays ?? 30,
+          params.maxMembersDefault ?? 6,
+          params.inviteRedirectUrl || null,
         ]
       );
 

@@ -6,7 +6,8 @@ import {
   getGroupsByCustomerId, 
   getGroupsByMerchantId,
   getGroupByInviteCode,
-  updateGroup 
+  updateGroup,
+  getDiscountConfig
 } from '@/lib/database/ff-groups';
 import { getSession } from '@/lib/auth/session';
 import { getUserById, findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
@@ -78,11 +79,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user can create groups
+    if (!user.can_create_groups) {
+      return NextResponse.json(
+        { error: 'You do not have permission to create groups. Please contact support to enable this feature.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    const { merchantId, name, max_members, maxMembers } = body;
-    
-    // Support both max_members and maxMembers for compatibility
-    const finalMaxMembers = max_members || maxMembers || 6;
+    const { merchantId, name } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -93,6 +99,10 @@ export async function POST(request: NextRequest) {
 
     // Use default merchantId if not provided (for single-tenant apps)
     const finalMerchantId = merchantId || 'default';
+    
+    // Get max_members from configuration (admin-controlled, not user input)
+    const config = await getDiscountConfig(finalMerchantId);
+    const finalMaxMembers = config?.max_members_default || 6;
 
     const group = await createGroup({
       merchantId: finalMerchantId,

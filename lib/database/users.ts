@@ -11,6 +11,7 @@ export interface User {
   is_active: boolean;
   role: string;
   shopify_customer_id: string | null;
+  can_create_groups?: boolean;
   created_at: Date;
   updated_at: Date;
   last_login_at: Date | null;
@@ -41,7 +42,7 @@ export async function createUser(params: CreateUserParams): Promise<User | null>
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, name, phone, role, shopify_customer_id)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at`,
+       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at`,
       [
         params.email,
         passwordHash,
@@ -65,7 +66,7 @@ export async function createUser(params: CreateUserParams): Promise<User | null>
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, password_hash, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at
+      `SELECT id, email, password_hash, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -88,7 +89,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 export async function getUserById(id: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at
+      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at
        FROM users
        WHERE id = $1`,
       [id]
@@ -193,7 +194,7 @@ export async function updateUser(
       `UPDATE users
        SET ${updates.join(', ')}
        WHERE id = $${paramCount}
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at`,
+       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at`,
       values
     );
 
@@ -210,7 +211,7 @@ export async function updateUser(
 export async function getUserByShopifyCustomerId(shopifyCustomerId: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at
+      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at
        FROM users
        WHERE shopify_customer_id = $1`,
       [shopifyCustomerId]
@@ -274,7 +275,7 @@ export async function findOrCreateUserByShopifyCustomerId(
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, name, role, shopify_customer_id, is_active)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at`,
+       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, created_at, updated_at, last_login_at`,
       [
         tempEmail,
         passwordHash,
