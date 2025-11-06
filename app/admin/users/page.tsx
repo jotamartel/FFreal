@@ -172,27 +172,11 @@ export default function UsersManagementPage() {
     user.email,
     user.name || '-',
     user.role,
-    <Badge
-      key={`active-${user.id}`}
-      tone={user.is_active ? 'success' : 'attention'}
-    >
-      {user.is_active ? 'Activo' : 'Inactivo'}
-    </Badge>,
-    <Checkbox
-      key={`can-create-${user.id}`}
-      label=""
-      checked={user.can_create_groups === true}
-      onChange={() => handleTogglePermission(user.id, user.can_create_groups)}
-      disabled={saving[user.id]}
-    />,
-    <Checkbox
-      key={`active-${user.id}`}
-      label=""
-      checked={user.is_active}
-      onChange={() => handleToggleActive(user.id, user.is_active)}
-      disabled={saving[user.id]}
-    />,
+    user.is_active ? 'Activo' : 'Inactivo',
+    user.can_create_groups ? 'Sí' : 'No',
+    user.is_active ? 'Sí' : 'No',
     user.created_at ? new Date(user.created_at).toLocaleDateString() : '-',
+    user.id, // Store user ID for actions
   ]);
 
   const headings = [
@@ -203,6 +187,7 @@ export default function UsersManagementPage() {
     'Puede Crear Grupos',
     'Activo',
     'Fecha Creación',
+    'Acciones',
   ];
 
   return (
@@ -296,11 +281,64 @@ export default function UsersManagementPage() {
               </EmptyState>
             ) : (
               <>
-                <DataTable
-                  columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                  headings={headings}
-                  rows={rows}
-                />
+                <BlockStack gap="400">
+                  {users.map((user) => (
+                    <Card key={user.id}>
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <BlockStack gap="200">
+                            <Text as="h3" variant="headingSm">
+                              {user.email}
+                            </Text>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              {user.name || 'Sin nombre'} • {user.role}
+                            </Text>
+                          </BlockStack>
+                          <Badge tone={user.is_active ? 'success' : 'attention'}>
+                            {user.is_active ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </InlineStack>
+                        
+                        <InlineStack gap="400" align="space-between">
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodyMd">
+                              <strong>Puede Crear Grupos:</strong>
+                            </Text>
+                            <Checkbox
+                              label="Permitir crear grupos de Friends & Family"
+                              checked={user.can_create_groups === true}
+                              onChange={() => handleTogglePermission(user.id, user.can_create_groups)}
+                              disabled={saving[user.id]}
+                            />
+                          </BlockStack>
+                          
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodyMd">
+                              <strong>Estado de Cuenta:</strong>
+                            </Text>
+                            <Checkbox
+                              label="Usuario activo (puede iniciar sesión)"
+                              checked={user.is_active}
+                              onChange={() => handleToggleActive(user.id, user.is_active)}
+                              disabled={saving[user.id]}
+                            />
+                          </BlockStack>
+                        </InlineStack>
+                        
+                        {saving[user.id] && (
+                          <Text as="p" variant="bodyMd" tone="subdued">
+                            Guardando...
+                          </Text>
+                        )}
+                        
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          Creado: {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                          {user.last_login_at && ` • Último acceso: ${new Date(user.last_login_at).toLocaleDateString()}`}
+                        </Text>
+                      </BlockStack>
+                    </Card>
+                  ))}
+                </BlockStack>
                 {total > limit && (
                   <div style={{ padding: '16px', textAlign: 'center' }}>
                     <InlineStack gap="400" align="center">
