@@ -145,7 +145,7 @@ export default function DiscountConfigPage() {
       secondaryActions={[
         {
           content: <LanguageSelector />,
-        },
+        } as any,
       ]}
     >
       <Layout>

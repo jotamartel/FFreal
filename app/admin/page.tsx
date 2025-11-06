@@ -37,7 +37,7 @@ export default function AdminDashboard() {
       secondaryActions={[
         {
           content: <LanguageSelector />,
-        },
+        } as any,
       ]}
     >
       <Layout>

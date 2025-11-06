@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
       secondaryActions={[
         {
           content: <LanguageSelector />,
-        },
+        } as any,
       ]}
     >
       <Layout>

@@ -186,7 +186,7 @@ export default function UsersManagementPage() {
         secondaryActions={[
           {
             content: <LanguageSelector />,
-          },
+          } as any,
         ]}
       >
       <Layout>
