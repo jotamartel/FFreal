@@ -61,8 +61,10 @@ export interface FFDiscountConfig {
 }
 
 export interface DiscountTier {
-  memberCount: number;
+  memberCount?: number; // Optional: for tiers based on group size
+  tierIdentifier?: string; // Optional: for tiers based on user's discount_tier_identifier
   discountValue: number;
+  label?: string; // Optional: human-readable label for the tier
 }
 
 export interface DiscountRules {

@@ -22,8 +22,10 @@ import { useI18n } from '@/lib/i18n/context';
 import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 interface DiscountTier {
-  memberCount: number;
+  memberCount?: number;
+  tierIdentifier?: string;
   discountValue: number;
+  label?: string;
 }
 
 interface DiscountRules {
@@ -49,7 +51,13 @@ export default function DiscountConfigPage() {
     { memberCount: 4, discountValue: 10 },
     { memberCount: 6, discountValue: 15 },
   ]);
-  const [newTier, setNewTier] = useState({ memberCount: '', discountValue: '' });
+  const [newTier, setNewTier] = useState({ 
+    memberCount: '', 
+    tierIdentifier: '', 
+    discountValue: '', 
+    tierType: 'memberCount' as 'memberCount' | 'tierIdentifier',
+    label: ''
+  });
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -84,7 +92,7 @@ export default function DiscountConfigPage() {
     setSuccess(false);
 
     try {
-      const merchantId = 'demo-merchant'; // Replace with actual merchant ID
+      const merchantId = 'default'; // Use 'default' for single-tenant apps
       const response = await fetch('/api/admin/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -112,15 +120,30 @@ export default function DiscountConfigPage() {
   };
 
   const addTier = () => {
-    if (newTier.memberCount && newTier.discountValue) {
-      setTiers([
-        ...tiers,
-        {
-          memberCount: parseInt(newTier.memberCount),
-          discountValue: parseFloat(newTier.discountValue),
-        },
-      ]);
-      setNewTier({ memberCount: '', discountValue: '' });
+    if (newTier.discountValue) {
+      const tier: DiscountTier = {
+        discountValue: parseFloat(newTier.discountValue),
+      };
+      
+      if (newTier.tierType === 'memberCount' && newTier.memberCount) {
+        tier.memberCount = parseInt(newTier.memberCount);
+      } else if (newTier.tierType === 'tierIdentifier' && newTier.tierIdentifier) {
+        tier.tierIdentifier = newTier.tierIdentifier;
+        if (newTier.label) {
+          tier.label = newTier.label;
+        }
+      } else {
+        return; // Don't add if required field is missing
+      }
+      
+      setTiers([...tiers, tier]);
+      setNewTier({ 
+        memberCount: '', 
+        tierIdentifier: '', 
+        discountValue: '', 
+        tierType: 'memberCount',
+        label: ''
+      });
     }
   };
 
@@ -222,10 +245,12 @@ export default function DiscountConfigPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Discount Tiers
+                {t('config.tiers')}
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                Define discount levels based on group size. Members get the discount tier that matches their current group size.
+                {t('config.tiersDescription')}
+                <br />• <strong>{t('config.tiersByMemberCount')}</strong>
+                <br />• <strong>{t('config.tiersByIdentifier')}</strong>
               </Text>
 
               {tiers.map((tier, index) => (
@@ -234,15 +259,24 @@ export default function DiscountConfigPage() {
                     <InlineStack align="space-between" blockAlign="center">
                       <BlockStack gap="200">
                         <Text as="p" variant="bodyMd">
-                          <strong>{tier.memberCount} members</strong> →{' '}
-                          {discountType === 'percentage' ? `${tier.discountValue}%` : `$${tier.discountValue}`} discount
+                          {tier.tierIdentifier ? (
+                            <>
+                              <strong>Tier: {tier.tierIdentifier}{tier.label ? ` (${tier.label})` : ''}</strong> →{' '}
+                              {discountType === 'percentage' ? `${tier.discountValue}%` : `$${tier.discountValue}`} discount
+                            </>
+                          ) : (
+                            <>
+                              <strong>{tier.memberCount} members</strong> →{' '}
+                              {discountType === 'percentage' ? `${tier.discountValue}%` : `$${tier.discountValue}`} discount
+                            </>
+                          )}
                         </Text>
                       </BlockStack>
                       <Button
                         tone="critical"
                         onClick={() => removeTier(index)}
                       >
-                        Remove
+                        {t('common.remove')}
                       </Button>
                     </InlineStack>
                   </BlockStack>
@@ -252,27 +286,77 @@ export default function DiscountConfigPage() {
               <Card>
                 <BlockStack gap="300">
                   <FormLayout>
-                    <InlineStack gap="400">
-                      <TextField
-                        label="Member Count"
-                        type="number"
-                        value={newTier.memberCount}
-                        onChange={(value) => setNewTier({ ...newTier, memberCount: value })}
-                        placeholder="e.g., 6"
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label={discountType === 'percentage' ? 'Discount %' : 'Discount Amount'}
-                        type="number"
-                        value={newTier.discountValue}
-                        onChange={(value) => setNewTier({ ...newTier, discountValue: value })}
-                        placeholder={discountType === 'percentage' ? 'e.g., 15' : 'e.g., 10.00'}
-                        autoComplete="off"
-                      />
-                      <div style={{ paddingTop: '20px' }}>
-                        <Button onClick={addTier}>Add Tier</Button>
-                      </div>
-                    </InlineStack>
+                    <Select
+                      label={t('config.tierType')}
+                      options={[
+                        { label: t('config.tierTypeMemberCount'), value: 'memberCount' },
+                        { label: t('config.tierTypeIdentifier'), value: 'tierIdentifier' },
+                      ]}
+                      value={newTier.tierType}
+                      onChange={(value) => setNewTier({ ...newTier, tierType: value as 'memberCount' | 'tierIdentifier' })}
+                    />
+                    
+                    {newTier.tierType === 'memberCount' ? (
+                      <InlineStack gap="400">
+                        <TextField
+                          label={t('config.memberCount')}
+                          type="number"
+                          value={newTier.memberCount}
+                          onChange={(value) => setNewTier({ ...newTier, memberCount: value })}
+                          placeholder="e.g., 6"
+                          autoComplete="off"
+                        />
+                        <TextField
+                          label={discountType === 'percentage' ? `${t('config.discountValue')} %` : `${t('config.discountValue')} ${t('config.fixedAmount')}`}
+                          type="number"
+                          value={newTier.discountValue}
+                          onChange={(value) => setNewTier({ ...newTier, discountValue: value })}
+                          placeholder={discountType === 'percentage' ? 'e.g., 15' : 'e.g., 10.00'}
+                          autoComplete="off"
+                        />
+                        <div style={{ paddingTop: '20px' }}>
+                          <Button onClick={addTier} disabled={!newTier.memberCount || !newTier.discountValue}>
+                            {t('config.addTier')}
+                          </Button>
+                        </div>
+                      </InlineStack>
+                    ) : (
+                      <BlockStack gap="300">
+                        <InlineStack gap="400">
+                          <TextField
+                            label={t('config.tierIdentifier')}
+                            value={newTier.tierIdentifier}
+                            onChange={(value) => setNewTier({ ...newTier, tierIdentifier: value })}
+                            placeholder="e.g., 1, 2, basic, premium"
+                            helpText={t('config.tierIdentifierHelp')}
+                            autoComplete="off"
+                          />
+                          <TextField
+                            label={t('config.tierLabel')}
+                            value={newTier.label}
+                            onChange={(value) => setNewTier({ ...newTier, label: value })}
+                            placeholder="e.g., Básico, Premium"
+                            helpText={t('config.tierLabelHelp')}
+                            autoComplete="off"
+                          />
+                        </InlineStack>
+                        <InlineStack gap="400">
+                          <TextField
+                            label={discountType === 'percentage' ? `${t('config.discountValue')} %` : `${t('config.discountValue')} ${t('config.fixedAmount')}`}
+                            type="number"
+                            value={newTier.discountValue}
+                            onChange={(value) => setNewTier({ ...newTier, discountValue: value })}
+                            placeholder={discountType === 'percentage' ? 'e.g., 15' : 'e.g., 10.00'}
+                            autoComplete="off"
+                          />
+                          <div style={{ paddingTop: '20px' }}>
+                            <Button onClick={addTier} disabled={!newTier.tierIdentifier || !newTier.discountValue}>
+                              {t('config.addTier')}
+                            </Button>
+                          </div>
+                        </InlineStack>
+                      </BlockStack>
+                    )}
                   </FormLayout>
                 </BlockStack>
               </Card>
