@@ -252,6 +252,7 @@ export default function UsersManagementPage() {
             ) : users.length === 0 ? (
               <EmptyState
                 heading="No se encontraron usuarios / No users found"
+                image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
                 action={{
                   content: 'Recargar / Reload',
                   onAction: loadUsers,
