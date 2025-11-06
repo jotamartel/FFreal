@@ -1,4 +1,5 @@
 import { shopifyApi } from '@shopify/shopify-api';
+import '@shopify/shopify-api/adapters/node';
 
 let shopifyInstance: ReturnType<typeof shopifyApi> | null = null;
 
