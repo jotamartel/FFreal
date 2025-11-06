@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Page,
@@ -12,10 +12,11 @@ import {
   Button,
   Banner,
   InlineStack,
+  Spinner,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
 
-export default function JoinGroupPage() {
+function JoinGroupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [inviteCode, setInviteCode] = useState('');
@@ -34,6 +35,7 @@ export default function JoinGroupPage() {
         handleSearch(codeParam.toUpperCase());
       }, 100);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const handleSearch = async (code?: string) => {
@@ -194,6 +196,22 @@ export default function JoinGroupPage() {
         )}
       </Layout>
     </Page>
+  );
+}
+
+export default function JoinGroupPage() {
+  return (
+    <Suspense fallback={
+      <Page title="Unirse a un Grupo">
+        <Card>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <Spinner size="large" />
+          </div>
+        </Card>
+      </Page>
+    }>
+      <JoinGroupContent />
+    </Suspense>
   );
 }
 
