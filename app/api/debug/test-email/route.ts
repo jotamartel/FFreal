@@ -1,4 +1,4 @@
-// API endpoint to test email sending
+// API endpoint to test email sending (supports both SMTP and Resend)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email/service';
@@ -21,12 +21,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Check environment variables
-    const hasApiKey = !!process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    const hasResend = !!process.env.RESEND_API_KEY;
+    const hasSMTP = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+    
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev';
     const apiKeyPrefix = process.env.RESEND_API_KEY?.substring(0, 5) || 'none';
 
     console.log('[TEST EMAIL] Configuration:', {
-      hasApiKey,
+      hasResend,
+      hasSMTP,
+      smtpHost: process.env.SMTP_HOST || 'not configured',
+      smtpUser: process.env.SMTP_USER ? process.env.SMTP_USER.substring(0, 3) + '***' : 'not configured',
       apiKeyPrefix: apiKeyPrefix + '...',
       fromEmail,
       to,
@@ -40,6 +45,7 @@ export async function POST(request: NextRequest) {
         <h1>Test Email</h1>
         <p>This is a test email from Friends & Family app.</p>
         <p>If you receive this, email configuration is working correctly!</p>
+        <p><strong>Service used:</strong> ${hasSMTP ? 'SMTP (Gmail/Outlook)' : hasResend ? 'Resend' : 'None configured'}</p>
       `,
       from: fromEmail,
     });
@@ -47,10 +53,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: result.success,
       error: result.error,
+      message: result.message,
       config: {
-        hasApiKey,
-        apiKeyPrefix: apiKeyPrefix + '...',
+        hasResend,
+        hasSMTP,
+        smtpHost: process.env.SMTP_HOST || null,
+        smtpPort: process.env.SMTP_PORT || null,
+        smtpUser: process.env.SMTP_USER ? process.env.SMTP_USER.substring(0, 3) + '***' : null,
         fromEmail,
+        serviceUsed: hasSMTP ? 'SMTP' : hasResend ? 'Resend' : 'None',
       },
     }, { status: result.success ? 200 : 500 });
 
@@ -70,20 +81,39 @@ export async function POST(request: NextRequest) {
  * GET /api/debug/test-email - Get email configuration status
  */
 export async function GET() {
-  const hasApiKey = !!process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const hasResend = !!process.env.RESEND_API_KEY;
+  const hasSMTP = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || process.env.SMTP_USER || 'onboarding@resend.dev';
   const apiKeyPrefix = process.env.RESEND_API_KEY?.substring(0, 5) || 'none';
+
+  const serviceStatus = hasSMTP 
+    ? 'SMTP configured (will be used first)'
+    : hasResend 
+    ? 'Resend configured (SMTP not configured)'
+    : 'No email service configured';
 
   return NextResponse.json({
     config: {
-      hasApiKey,
-      apiKeyPrefix: apiKeyPrefix + '...',
+      hasResend,
+      hasSMTP,
+      smtpHost: process.env.SMTP_HOST || null,
+      smtpPort: process.env.SMTP_PORT || null,
+      smtpUser: process.env.SMTP_USER ? process.env.SMTP_USER.substring(0, 3) + '***' : null,
+      smtpFromEmail: process.env.SMTP_FROM_EMAIL || null,
+      resendApiKeyPrefix: apiKeyPrefix + '...',
+      resendFromEmail: process.env.RESEND_FROM_EMAIL || null,
       fromEmail,
-      apiKeyLength: process.env.RESEND_API_KEY?.length || 0,
+      servicePriority: hasSMTP ? 'SMTP → Resend' : hasResend ? 'Resend only' : 'None',
     },
-    message: hasApiKey 
-      ? 'RESEND_API_KEY is configured. Use POST to test email sending.'
-      : 'RESEND_API_KEY is not configured. Add it to Vercel environment variables.',
+    message: serviceStatus + '. Use POST to test email sending.',
+    instructions: {
+      smtp: hasSMTP 
+        ? 'SMTP is configured and will be used first'
+        : 'To configure SMTP, add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD to Vercel environment variables',
+      resend: hasResend
+        ? 'Resend is configured and will be used as fallback if SMTP fails'
+        : 'To configure Resend, add RESEND_API_KEY to Vercel environment variables',
+    },
   });
 }
 
