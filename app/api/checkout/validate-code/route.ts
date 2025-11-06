@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate discount for this group
-    const discount = await calculateDiscount(merchantId, group.current_members);
+    // Try by tierIdentifier first (from group.discount_tier), then fallback to memberCount
+    const discount = await calculateDiscount(merchantId, group.current_members, group.discount_tier);
 
     return NextResponse.json({
       valid: true,

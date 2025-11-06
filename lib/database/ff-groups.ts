@@ -807,7 +807,8 @@ export async function upsertDiscountConfig(
  */
 export async function calculateDiscount(
   merchantId: string,
-  memberCount: number
+  memberCount: number,
+  discountTier?: number | string
 ): Promise<number> {
   try {
     const config = await getDiscountConfig(merchantId);
@@ -821,13 +822,26 @@ export async function calculateDiscount(
       return 0;
     }
 
-    // Ordenar tiers por memberCount descendente
-    const sortedTiers = [...tiers].sort((a, b) => b.memberCount - a.memberCount);
-    
-    // Encontrar el tier apropiado
-    for (const tier of sortedTiers) {
-      if (memberCount >= tier.memberCount) {
-        return tier.discountValue;
+    // First, try to find by tierIdentifier (if discountTier is provided)
+    if (discountTier !== undefined) {
+      const tierIdentifier = typeof discountTier === 'string' ? discountTier : discountTier.toString();
+      const tierByIdentifier = tiers.find(t => t.tierIdentifier === tierIdentifier);
+      if (tierByIdentifier) {
+        return tierByIdentifier.discountValue;
+      }
+    }
+
+    // Fallback: find by memberCount (only tiers with memberCount defined)
+    const tiersByMemberCount = tiers.filter(t => t.memberCount !== undefined);
+    if (tiersByMemberCount.length > 0) {
+      // Ordenar tiers por memberCount descendente
+      const sortedTiers = [...tiersByMemberCount].sort((a, b) => (b.memberCount || 0) - (a.memberCount || 0));
+      
+      // Encontrar el tier apropiado
+      for (const tier of sortedTiers) {
+        if (tier.memberCount && memberCount >= tier.memberCount) {
+          return tier.discountValue;
+        }
       }
     }
 
