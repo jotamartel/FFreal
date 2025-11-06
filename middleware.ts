@@ -38,14 +38,19 @@ export async function middleware(request: NextRequest) {
       const origin = request.headers.get('origin') || '*';
       console.log('[Middleware] Origin:', origin);
       
+      // For Web Workers (null origin), we must use '*' or the specific origin
+      // Shopify UI extensions run in Web Workers with null origin
+      const allowOrigin = origin === 'null' || !origin ? '*' : origin;
+      
       const response = new NextResponse(null, {
         status: 200,
         headers: {
-          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Origin': allowOrigin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           'Access-Control-Max-Age': '86400',
-          'Access-Control-Allow-Credentials': 'true',
+          // Note: Cannot use 'Access-Control-Allow-Credentials: true' with '*'
+          // So we omit it when using '*'
         },
       });
       

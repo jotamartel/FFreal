@@ -12,6 +12,7 @@ import { findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
 export const dynamic = 'force-dynamic';
 
 // CORS headers for Customer Account Extensions
+// Note: UI extensions run in Web Workers with null origin, so we must use '*'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
