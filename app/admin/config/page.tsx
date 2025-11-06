@@ -371,7 +371,7 @@ export default function DiscountConfigPage() {
               loading={saving}
               onClick={handleSave}
             >
-              Save Configuration
+              {t('config.save')}
             </Button>
           </InlineStack>
         </Layout.Section>
