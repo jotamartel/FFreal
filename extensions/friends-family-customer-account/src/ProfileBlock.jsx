@@ -24,10 +24,11 @@ function FriendsFamilyBlock() {
       
       // Verificar si hay una cuenta autenticada
       const authenticatedAccount = shopify.authenticatedAccount;
+      const customer = authenticatedAccount?.customer?.value;
       console.log('[ProfileBlock] Authenticated account:', {
         hasAccount: !!authenticatedAccount,
-        customerId: authenticatedAccount?.customerId,
-        customerGid: authenticatedAccount?.customerGid,
+        hasCustomer: !!customer,
+        customerId: customer?.id,
       });
       
       // Obtener el token de sesión del cliente desde Shopify
@@ -51,9 +52,9 @@ function FriendsFamilyBlock() {
       
       // Build API URL with customer ID if available from authenticatedAccount
       let apiUrl = `${appUrl}/api/customer/group`;
-      if (authenticatedAccount?.customerGid) {
+      if (customer?.id) {
         // Extract numeric customer ID from GID format: gid://shopify/Customer/123456
-        const customerIdMatch = authenticatedAccount.customerGid.match(/Customer\/(\d+)/);
+        const customerIdMatch = customer.id.match(/Customer\/(\d+)/);
         if (customerIdMatch && customerIdMatch[1]) {
           apiUrl += `?customerId=${customerIdMatch[1]}`;
           console.log('[ProfileBlock] Using customer ID from authenticatedAccount:', customerIdMatch[1]);

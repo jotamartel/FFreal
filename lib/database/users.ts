@@ -230,6 +230,7 @@ export async function getUserByShopifyCustomerId(shopifyCustomerId: string): Pro
 /**
  * Find or create user by Shopify customer ID
  * This is useful for Customer Account Extensions where we only have the Shopify customer ID
+ * If the user doesn't exist, creates a basic user account linked to the Shopify customer ID
  */
 export async function findOrCreateUserByShopifyCustomerId(
   shopifyCustomerId: string,
@@ -240,6 +241,7 @@ export async function findOrCreateUserByShopifyCustomerId(
     let user = await getUserByShopifyCustomerId(shopifyCustomerId);
     
     if (user) {
+      console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Found existing user for Shopify customer ID: ${shopifyCustomerId}`);
       return user;
     }
 
@@ -252,16 +254,42 @@ export async function findOrCreateUserByShopifyCustomerId(
           `UPDATE users SET shopify_customer_id = $1, updated_at = NOW() WHERE id = $2`,
           [shopifyCustomerId, userByEmail.id]
         );
+        console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Linked existing user by email to Shopify customer ID: ${shopifyCustomerId}`);
         return { ...userByEmail, shopify_customer_id: shopifyCustomerId };
       }
     }
 
-    // If still not found, we can't create a user without email/password
-    // This should be handled by the registration flow
-    console.warn(`[findOrCreateUserByShopifyCustomerId] User not found for Shopify customer ID: ${shopifyCustomerId}`);
-    return null;
+    // If still not found, create a basic user account for this Shopify customer
+    // This allows Customer Account Extensions to work without requiring full registration
+    // The user can complete registration later if needed
+    console.log(`[findOrCreateUserByShopifyCustomerId] Creating new user for Shopify customer ID: ${shopifyCustomerId}`);
+    
+    // Generate a temporary email if none provided
+    const tempEmail = email || `shopify_customer_${shopifyCustomerId}@temp.local`;
+    
+    // Generate a random password (user won't be able to login with this until they register properly)
+    const tempPassword = `temp_${shopifyCustomerId}_${Date.now()}`;
+    const passwordHash = await hashPassword(tempPassword);
+    
+    const result = await pool.query(
+      `INSERT INTO users (email, password_hash, name, role, shopify_customer_id, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, created_at, updated_at, last_login_at`,
+      [
+        tempEmail,
+        passwordHash,
+        `Shopify Customer ${shopifyCustomerId}`,
+        'customer',
+        shopifyCustomerId,
+        true, // Active by default
+      ]
+    );
+
+    const newUser = result.rows[0] as User;
+    console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Created new user for Shopify customer ID: ${shopifyCustomerId}, userId: ${newUser.id}`);
+    return newUser;
   } catch (error) {
-    console.error('Error finding or creating user by Shopify customer ID:', error);
+    console.error('[findOrCreateUserByShopifyCustomerId] Error finding or creating user by Shopify customer ID:', error);
     return null;
   }
 }
