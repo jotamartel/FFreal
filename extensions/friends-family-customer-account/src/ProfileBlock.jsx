@@ -1,6 +1,6 @@
 import '@shopify/ui-extensions/preact';
 import {render} from "preact";
-import {useState, useEffect, useRef} from 'preact/hooks';
+import {useState, useEffect} from 'preact/hooks';
 
 export default async () => {
   render(<FriendsFamilyBlock />, document.body);
@@ -10,7 +10,7 @@ function FriendsFamilyBlock() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const modalRef = useRef();
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [createGroupError, setCreateGroupError] = useState(null);
   
@@ -196,10 +196,8 @@ function FriendsFamilyBlock() {
       const data = await response.json();
       console.log('[ProfileBlock] Group created successfully:', data);
       
-      // Close modal and reset form
-      if (modalRef.current) {
-        modalRef.current.hideOverlay();
-      }
+      // Close form and reset
+      setShowCreateForm(false);
       setGroupName('');
       setMaxMembers('6');
       
@@ -218,75 +216,74 @@ function FriendsFamilyBlock() {
       <s-section heading="Friends & Family">
         <s-stack direction="block" gap="base">
           <s-text>No tienes grupos activos de Friends & Family.</s-text>
-          <s-button 
-            variant="primary" 
-            onClick={() => {
-              console.log('[ProfileBlock] Button clicked, opening modal');
-              if (modalRef.current) {
-                modalRef.current.showOverlay();
-              }
-            }}
-          >
-            Crear un grupo
-          </s-button>
           
-          <s-modal ref={modalRef} id="create-group-modal">
-            <s-stack direction="block" gap="base">
-              <s-heading>Crear Grupo Friends & Family</s-heading>
-              
-              {createGroupError && (
-                <s-banner tone="critical">
-                  <s-text>{createGroupError}</s-text>
-                </s-banner>
-              )}
-              
-              <s-text-field
-                label="Nombre del Grupo"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Ej: Mi Familia"
-                disabled={creatingGroup}
-              />
-              
-              <s-text-field
-                type="number"
-                label="Máximo de Miembros"
-                value={maxMembers}
-                onChange={(e) => setMaxMembers(e.target.value)}
-                min="2"
-                max="20"
-                disabled={creatingGroup}
-              />
-              
-              <s-text appearance="subdued">
-                Máximo de personas que pueden unirse al grupo (incluyéndote)
-              </s-text>
-              
-              <s-stack direction="inline" gap="base" alignment="end">
-                <s-button
-                  variant="secondary"
-                  onClick={() => {
-                    if (modalRef.current) {
-                      modalRef.current.hideOverlay();
-                    }
-                    setCreateGroupError(null);
-                    setGroupName('');
-                    setMaxMembers('6');
-                  }}
+          {!showCreateForm ? (
+            <s-button 
+              variant="primary" 
+              onClick={() => {
+                console.log('[ProfileBlock] Button clicked, showing form');
+                setShowCreateForm(true);
+              }}
+            >
+              Crear un grupo
+            </s-button>
+          ) : (
+            <s-card>
+              <s-stack direction="block" gap="base">
+                <s-heading>Crear Grupo Friends & Family</s-heading>
+                
+                {createGroupError && (
+                  <s-banner tone="critical">
+                    <s-text>{createGroupError}</s-text>
+                  </s-banner>
+                )}
+                
+                <s-text-field
+                  label="Nombre del Grupo"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Ej: Mi Familia"
                   disabled={creatingGroup}
-                >
-                  Cancelar
-                </s-button>
-                <s-button
-                  variant="primary"
-                  onClick={createGroup}
-                  loading={creatingGroup}
-                >
-                  Crear Grupo
-                </s-button>
+                />
+                
+                <s-text-field
+                  type="number"
+                  label="Máximo de Miembros"
+                  value={maxMembers}
+                  onChange={(e) => setMaxMembers(e.target.value)}
+                  min="2"
+                  max="20"
+                  disabled={creatingGroup}
+                />
+                
+                <s-text appearance="subdued">
+                  Máximo de personas que pueden unirse al grupo (incluyéndote)
+                </s-text>
+                
+                <s-stack direction="inline" gap="base" alignment="end">
+                  <s-button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setCreateGroupError(null);
+                      setGroupName('');
+                      setMaxMembers('6');
+                    }}
+                    disabled={creatingGroup}
+                  >
+                    Cancelar
+                  </s-button>
+                  <s-button
+                    variant="primary"
+                    onClick={createGroup}
+                    loading={creatingGroup}
+                  >
+                    Crear Grupo
+                  </s-button>
+                </s-stack>
               </s-stack>
-            </s-stack>
-          </s-modal>
+            </s-card>
+          )}
         </s-stack>
       </s-section>
     );
@@ -337,75 +334,73 @@ function FriendsFamilyBlock() {
           </s-card>
         ))}
         
-        <s-button 
-          variant="primary" 
-          onClick={() => {
-            console.log('[ProfileBlock] Button clicked, opening modal');
-            if (modalRef.current) {
-              modalRef.current.showOverlay();
-            }
-          }}
-        >
-          Crear nuevo grupo
-        </s-button>
-        
-        <s-modal ref={modalRef} id="create-group-modal">
-          <s-stack direction="block" gap="base">
-            <s-heading>Crear Grupo Friends & Family</s-heading>
-            
-            {createGroupError && (
-              <s-banner tone="critical">
-                <s-text>{createGroupError}</s-text>
-              </s-banner>
-            )}
-            
-            <s-text-field
-              label="Nombre del Grupo"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Ej: Mi Familia"
-              disabled={creatingGroup}
-            />
-            
-            <s-text-field
-              type="number"
-              label="Máximo de Miembros"
-              value={maxMembers}
-              onChange={(e) => setMaxMembers(e.target.value)}
-              min="2"
-              max="20"
-              disabled={creatingGroup}
-            />
-            
-            <s-text appearance="subdued">
-              Máximo de personas que pueden unirse al grupo (incluyéndote)
-            </s-text>
-            
-            <s-stack direction="inline" gap="base" alignment="end">
-              <s-button
-                variant="secondary"
-                onClick={() => {
-                  if (modalRef.current) {
-                    modalRef.current.hideOverlay();
-                  }
-                  setCreateGroupError(null);
-                  setGroupName('');
-                  setMaxMembers('6');
-                }}
+        {!showCreateForm ? (
+          <s-button 
+            variant="primary" 
+            onClick={() => {
+              console.log('[ProfileBlock] Button clicked, showing form');
+              setShowCreateForm(true);
+            }}
+          >
+            Crear nuevo grupo
+          </s-button>
+        ) : (
+          <s-card>
+            <s-stack direction="block" gap="base">
+              <s-heading>Crear Grupo Friends & Family</s-heading>
+              
+              {createGroupError && (
+                <s-banner tone="critical">
+                  <s-text>{createGroupError}</s-text>
+                </s-banner>
+              )}
+              
+              <s-text-field
+                label="Nombre del Grupo"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Ej: Mi Familia"
                 disabled={creatingGroup}
-              >
-                Cancelar
-              </s-button>
-              <s-button
-                variant="primary"
-                onClick={createGroup}
-                loading={creatingGroup}
-              >
-                Crear Grupo
-              </s-button>
+              />
+              
+              <s-text-field
+                type="number"
+                label="Máximo de Miembros"
+                value={maxMembers}
+                onChange={(e) => setMaxMembers(e.target.value)}
+                min="2"
+                max="20"
+                disabled={creatingGroup}
+              />
+              
+              <s-text appearance="subdued">
+                Máximo de personas que pueden unirse al grupo (incluyéndote)
+              </s-text>
+              
+              <s-stack direction="inline" gap="base" alignment="end">
+                <s-button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setCreateGroupError(null);
+                    setGroupName('');
+                    setMaxMembers('6');
+                  }}
+                  disabled={creatingGroup}
+                >
+                  Cancelar
+                </s-button>
+                <s-button
+                  variant="primary"
+                  onClick={createGroup}
+                  loading={creatingGroup}
+                >
+                  Crear Grupo
+                </s-button>
+              </s-stack>
             </s-stack>
-          </s-stack>
-        </s-modal>
+          </s-card>
+        )}
       </s-stack>
     </s-section>
   );
