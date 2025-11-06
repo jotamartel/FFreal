@@ -1,11 +1,27 @@
-// Email Service using Resend
+// Email Service - Supports Resend and SMTP (Gmail/Outlook)
 
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 // Initialize Resend only if API key is available (to prevent build errors)
 const resend = process.env.RESEND_API_KEY 
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
+
+// Initialize SMTP transporter if SMTP is configured
+let smtpTransporter: nodemailer.Transporter | null = null;
+
+if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+  smtpTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+}
 
 export interface EmailOptions {
   to: string;
@@ -14,66 +30,138 @@ export interface EmailOptions {
   from?: string;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
+/**
+ * Send email using SMTP (Gmail, Outlook, etc.)
+ */
+async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
+  if (!smtpTransporter) {
+    return { success: false, error: 'SMTP not configured' };
+  }
+
   try {
-    if (!process.env.RESEND_API_KEY || !resend) {
-      const errorMsg = 'RESEND_API_KEY not configured, skipping email send';
-      console.error('[EMAIL]', errorMsg);
-      return { success: false, error: errorMsg };
+    const fromEmail = options.from || process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+    
+    if (!fromEmail) {
+      return { success: false, error: 'SMTP_FROM_EMAIL or SMTP_USER not configured' };
     }
 
-    // Use verified domain or default to Resend test domain
-    let fromEmail = options.from || process.env.RESEND_FROM_EMAIL;
-    
-    // If no from email is set, or if it's a placeholder, use Resend test domain
-    if (!fromEmail || fromEmail.includes('yourdomain.com') || fromEmail.includes('example.com')) {
-      fromEmail = 'onboarding@resend.dev';
-      console.warn('[EMAIL] Using Resend test domain. Configure RESEND_FROM_EMAIL with a verified domain for production.');
-    }
-    
-    console.log('[EMAIL] Attempting to send email:', {
+    console.log('[EMAIL] Sending via SMTP:', {
       to: options.to,
       from: fromEmail,
       subject: options.subject,
-      hasApiKey: !!process.env.RESEND_API_KEY,
-      apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 5) + '...',
+      host: process.env.SMTP_HOST,
     });
 
-    const result = await resend.emails.send({
+    const info = await smtpTransporter.sendMail({
       from: fromEmail,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    if (result.error) {
-      console.error('[EMAIL] Resend API error:', result.error);
-      
-      // Check for specific error types and provide user-friendly messages
-      const error = result.error as any;
-      if (error.statusCode === 403 && error.name === 'validation_error') {
-        // This is the "test domain" error - provide helpful message
-        return { 
-          success: false, 
-          error: 'DOMAIN_NOT_VERIFIED',
-          message: 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada, pero el email no pudo ser enviado. Puedes compartir el código de invitación manualmente.'
-        };
+    console.log('[EMAIL] Email sent via SMTP:', {
+      messageId: info.messageId,
+      to: options.to,
+    });
+
+    return { success: true, message: info.messageId };
+  } catch (error: any) {
+    console.error('[EMAIL] SMTP error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to send email via SMTP' 
+    };
+  }
+}
+
+/**
+ * Send email using Resend
+ */
+async function sendEmailViaResend(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
+  if (!process.env.RESEND_API_KEY || !resend) {
+    return { success: false, error: 'RESEND_API_KEY not configured' };
+  }
+
+  // Use verified domain or default to Resend test domain
+  let fromEmail = options.from || process.env.RESEND_FROM_EMAIL;
+  
+  // If no from email is set, or if it's a placeholder, use Resend test domain
+  if (!fromEmail || fromEmail.includes('yourdomain.com') || fromEmail.includes('example.com')) {
+    fromEmail = 'onboarding@resend.dev';
+    console.warn('[EMAIL] Using Resend test domain. Configure RESEND_FROM_EMAIL with a verified domain for production.');
+  }
+  
+  console.log('[EMAIL] Attempting to send email via Resend:', {
+    to: options.to,
+    from: fromEmail,
+    subject: options.subject,
+    hasApiKey: !!process.env.RESEND_API_KEY,
+    apiKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 5) + '...',
+  });
+
+  const result = await resend.emails.send({
+    from: fromEmail,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+  });
+
+  if (result.error) {
+    console.error('[EMAIL] Resend API error:', result.error);
+    
+    // Check for specific error types and provide user-friendly messages
+    const error = result.error as any;
+    if (error.statusCode === 403 && error.name === 'validation_error') {
+      // This is the "test domain" error - provide helpful message
+      return { 
+        success: false, 
+        error: 'DOMAIN_NOT_VERIFIED',
+        message: 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada, pero el email no pudo ser enviado. Puedes compartir el código de invitación manualmente.'
+      };
+    }
+    
+    return { success: false, error: JSON.stringify(result.error) };
+  }
+
+  if (result.data) {
+    console.log('[EMAIL] Email sent successfully via Resend:', {
+      id: result.data.id,
+      to: options.to,
+      from: fromEmail,
+    });
+    return { success: true, message: result.data.id };
+  }
+
+  console.error('[EMAIL] No data returned from Resend');
+  return { success: false, error: 'No data returned from Resend API' };
+}
+
+/**
+ * Main email sending function - tries SMTP first, then Resend
+ */
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    // Priority: SMTP if configured, then Resend
+    if (smtpTransporter) {
+      console.log('[EMAIL] Using SMTP transport');
+      const result = await sendEmailViaSMTP(options);
+      if (result.success) {
+        return result;
       }
-      
-      return { success: false, error: JSON.stringify(result.error) };
+      // If SMTP fails, fallback to Resend if available
+      console.warn('[EMAIL] SMTP failed, trying Resend as fallback');
     }
 
-    if (result.data) {
-      console.log('[EMAIL] Email sent successfully:', {
-        id: result.data.id,
-        to: options.to,
-        from: fromEmail,
-      });
-      return { success: true };
+    // Try Resend if SMTP is not configured or failed
+    if (resend) {
+      console.log('[EMAIL] Using Resend transport');
+      return await sendEmailViaResend(options);
     }
 
-    console.error('[EMAIL] No data returned from Resend');
-    return { success: false, error: 'No data returned from Resend API' };
+    // No email service configured
+    const errorMsg = 'No email service configured. Configure either SMTP or RESEND_API_KEY.';
+    console.error('[EMAIL]', errorMsg);
+    return { success: false, error: errorMsg };
   } catch (error: any) {
     console.error('[EMAIL] Error sending email:', {
       error: error.message,
@@ -206,4 +294,3 @@ export async function sendVerificationEmail(
 
   return result.success;
 }
-
