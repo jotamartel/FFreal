@@ -21,17 +21,23 @@ const authRoutes = ['/login'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Handle CORS preflight requests for API routes
-  if (request.method === 'OPTIONS' && pathname.startsWith('/api/')) {
-    return new NextResponse(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
+  // Handle CORS preflight requests for API routes FIRST
+  // This must be checked before any other logic
+  if (request.method === 'OPTIONS') {
+    if (pathname.startsWith('/api/')) {
+      console.log('[Middleware] Handling OPTIONS preflight for:', pathname);
+      return new NextResponse(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+    // For non-API OPTIONS, just pass through
+    return NextResponse.next();
   }
 
   // Get token from cookies

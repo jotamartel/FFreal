@@ -21,12 +21,16 @@ const corsHeaders = {
 
 /**
  * Handle preflight OPTIONS requests
+ * This is a fallback in case the middleware doesn't catch it
  */
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { 
+  console.log('[OPTIONS /api/customer/group] Handling preflight request');
+  const response = new NextResponse(null, { 
     status: 200, 
     headers: corsHeaders 
   });
+  console.log('[OPTIONS /api/customer/group] Response headers:', Object.fromEntries(response.headers.entries()));
+  return response;
 }
 
 /**
