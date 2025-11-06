@@ -18,14 +18,32 @@ function FriendsFamilyBlock() {
   async function fetchGroups() {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('[ProfileBlock] Starting to fetch groups...');
       
       // Obtener el token de sesión del cliente desde Shopify
-      const sessionToken = await shopify.sessionToken.get();
+      let sessionToken;
+      try {
+        sessionToken = await shopify.sessionToken.get();
+        console.log('[ProfileBlock] Session token obtained, length:', sessionToken?.length || 0);
+      } catch (tokenError) {
+        console.error('[ProfileBlock] Error getting session token:', tokenError);
+        throw new Error('No se pudo obtener el token de sesión');
+      }
+      
+      if (!sessionToken) {
+        throw new Error('Token de sesión no disponible');
+      }
       
       // Llamar a la API de tu aplicación
       // Nota: Necesitas usar la URL completa de tu aplicación en Vercel
       const appUrl = 'https://shopify-friends-family-app.vercel.app';
-      const response = await fetch(`${appUrl}/api/customer/group`, {
+      const apiUrl = `${appUrl}/api/customer/group`;
+      
+      console.log('[ProfileBlock] Fetching from:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -34,15 +52,34 @@ function FriendsFamilyBlock() {
         credentials: 'include', // Para incluir cookies de autenticación
       });
 
+      console.log('[ProfileBlock] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error('Error al cargar grupos');
+        const errorText = await response.text();
+        console.error('[ProfileBlock] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        });
+        
+        let errorMessage = 'Error al cargar grupos';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // Si no es JSON, usar el texto
+          errorMessage = errorText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('[ProfileBlock] Success! Groups received:', data.groups?.length || 0);
       setGroups(data.groups || []);
     } catch (err) {
-      console.error('Error fetching groups:', err);
-      setError(err.message);
+      console.error('[ProfileBlock] Error fetching groups:', err);
+      setError(err.message || 'Error desconocido al cargar grupos');
     } finally {
       setLoading(false);
     }

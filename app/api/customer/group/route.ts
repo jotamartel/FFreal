@@ -18,6 +18,18 @@ export const dynamic = 'force-dynamic';
  * 2. Shopify session token (from Authorization header) - for Customer Account Extensions
  */
 export async function GET(request: NextRequest) {
+  // CORS headers for Customer Account Extensions
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
+  // Handle preflight requests
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 200, headers: corsHeaders });
+  }
+
   try {
     let userId: string | null = null;
 
@@ -83,12 +95,18 @@ export async function GET(request: NextRequest) {
     // Get groups by user_id (preferred) or fallback to customer_id if user_id not available
     const groups = await getGroupsByUserId(userId, merchantId || undefined);
 
-    return NextResponse.json({ groups }, { status: 200 });
+    return NextResponse.json({ groups }, { 
+      status: 200,
+      headers: corsHeaders,
+    });
   } catch (error) {
     console.error('Error getting customer group:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: corsHeaders,
+      }
     );
   }
 }
