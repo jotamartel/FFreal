@@ -233,9 +233,9 @@ export default function GroupsPage() {
 
   if (loading) {
     return (
-      <Page title="Groups">
+      <Page title={t('groups.title')}>
         <Card>
-          <Text as="p">Loading...</Text>
+          <Text as="p">{t('common.loading')}</Text>
         </Card>
       </Page>
     );

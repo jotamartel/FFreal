@@ -18,6 +18,8 @@ import {
   Badge,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 interface DiscountTier {
   memberCount: number;
@@ -33,6 +35,7 @@ interface DiscountRules {
 
 export default function DiscountConfigPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
