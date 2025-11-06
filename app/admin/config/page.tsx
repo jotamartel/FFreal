@@ -39,6 +39,8 @@ export default function DiscountConfigPage() {
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [maxGroupsPerEmail, setMaxGroupsPerEmail] = useState('1');
   const [coolingPeriodDays, setCoolingPeriodDays] = useState('30');
+  const [maxMembersDefault, setMaxMembersDefault] = useState('6');
+  const [inviteRedirectUrl, setInviteRedirectUrl] = useState('');
   const [tiers, setTiers] = useState<DiscountTier[]>([
     { memberCount: 2, discountValue: 5 },
     { memberCount: 4, discountValue: 10 },
@@ -54,7 +56,7 @@ export default function DiscountConfigPage() {
   const loadConfig = async () => {
     try {
       // TODO: Get merchant ID from session
-      const merchantId = 'demo-merchant'; // Replace with actual merchant ID
+      const merchantId = 'default'; // Use 'default' for single-tenant apps
       const response = await fetch(`/api/admin/config?merchantId=${merchantId}`);
       const data = await response.json();
       
@@ -63,6 +65,8 @@ export default function DiscountConfigPage() {
         setDiscountType(data.config.discount_type);
         setMaxGroupsPerEmail(data.config.max_groups_per_email?.toString() || '1');
         setCoolingPeriodDays(data.config.cooling_period_days?.toString() || '30');
+        setMaxMembersDefault(data.config.max_members_default?.toString() || '6');
+        setInviteRedirectUrl(data.config.invite_redirect_url || '');
         setTiers(data.config.tiers || []);
       }
     } catch (error) {
@@ -88,6 +92,8 @@ export default function DiscountConfigPage() {
           tiers,
           maxGroupsPerEmail: parseInt(maxGroupsPerEmail),
           coolingPeriodDays: parseInt(coolingPeriodDays),
+          maxMembersDefault: parseInt(maxMembersDefault),
+          inviteRedirectUrl: inviteRedirectUrl || null,
         }),
       });
 
@@ -178,6 +184,25 @@ export default function DiscountConfigPage() {
                   value={coolingPeriodDays}
                   onChange={setCoolingPeriodDays}
                   helpText="Days a customer must wait after leaving a group before joining another"
+                  autoComplete="off"
+                />
+
+                <TextField
+                  label="Default Max Members Per Group"
+                  type="number"
+                  value={maxMembersDefault}
+                  onChange={setMaxMembersDefault}
+                  helpText="Maximum number of members allowed in each group (cannot be set by users, admin-controlled only)"
+                  autoComplete="off"
+                />
+
+                <TextField
+                  label="Invitation Redirect URL"
+                  type="url"
+                  value={inviteRedirectUrl}
+                  onChange={setInviteRedirectUrl}
+                  helpText="URL where invitation emails should redirect users (e.g., https://yourstore.com/tienda/unirse). If empty, uses app default."
+                  placeholder="https://yourstore.com/tienda/unirse"
                   autoComplete="off"
                 />
               </FormLayout>
