@@ -90,7 +90,14 @@ export async function GET(request: NextRequest) {
             console.warn('[GET /api/customer/group] Could not extract customer ID from token. Token structure:', {
               sub: shopifySessionToken?.sub,
               hasSub: !!shopifySessionToken?.sub,
+              iss: shopifySessionToken?.iss,
+              dest: shopifySessionToken?.dest,
+              aud: shopifySessionToken?.aud,
             });
+            console.warn('[GET /api/customer/group] ⚠️ Token does not contain customer ID (sub claim). This may happen if:');
+            console.warn('[GET /api/customer/group]   1. Customer is not logged in to their account');
+            console.warn('[GET /api/customer/group]   2. App does not have read_customers permission');
+            console.warn('[GET /api/customer/group]   3. Token is from checkout context instead of customer account');
           }
         } else {
           console.warn('[GET /api/customer/group] Shopify session token validation failed. Token present but invalid.');
@@ -105,6 +112,22 @@ export async function GET(request: NextRequest) {
 
     // Fallback to JWT session if no Shopify token or if Shopify token didn't work
     if (!userId) {
+      // If we have a Shopify token but no customer ID, provide a helpful error
+      if (authHeader) {
+        return NextResponse.json(
+          { 
+            error: 'Customer not authenticated',
+            message: 'The session token is valid but does not contain a customer ID. Please ensure you are logged in to your customer account.',
+            details: 'The sub claim is missing from the session token. This typically means the customer is not logged in or the app does not have the required permissions.'
+          },
+          { 
+            status: 401,
+            headers: corsHeaders,
+          }
+        );
+      }
+      
+      // Try JWT session as fallback
       const session = await getSession();
       
       if (!session) {
