@@ -72,6 +72,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       canCreateGroups: user.can_create_groups === true,
+      maxMembersPerGroup: user.max_members_per_group || null,
+      discountTierIdentifier: user.discount_tier_identifier || null,
     }, { status: 200 });
   } catch (error) {
     console.error('Error checking permissions:', error);

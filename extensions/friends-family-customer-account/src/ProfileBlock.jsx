@@ -11,11 +11,22 @@ function FriendsFamilyBlock() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [canCreateGroups, setCanCreateGroups] = useState(false);
+  const [maxMembersPerGroup, setMaxMembersPerGroup] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [createGroupError, setCreateGroupError] = useState(null);
   const [inviteCode, setInviteCode] = useState('');
   const [joiningGroup, setJoiningGroup] = useState(false);
+  
+  // Group details state
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [groupDetails, setGroupDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState(null);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
   
   // Form state
   const [groupName, setGroupName] = useState('');
@@ -53,7 +64,11 @@ function FriendsFamilyBlock() {
       if (response.ok) {
         const data = await response.json();
         setCanCreateGroups(data.canCreateGroups === true);
-        console.log('[ProfileBlock] User can create groups:', data.canCreateGroups);
+        setMaxMembersPerGroup(data.maxMembersPerGroup || null);
+        console.log('[ProfileBlock] User permissions:', {
+          canCreateGroups: data.canCreateGroups,
+          maxMembersPerGroup: data.maxMembersPerGroup,
+        });
       } else {
         console.warn('[ProfileBlock] Could not fetch permissions, defaulting to false');
         setCanCreateGroups(false);
@@ -71,7 +86,6 @@ function FriendsFamilyBlock() {
       
       console.log('[ProfileBlock] Starting to fetch groups...');
       
-      // Verificar si hay una cuenta autenticada
       const authenticatedAccount = shopify.authenticatedAccount;
       const customer = authenticatedAccount?.customer?.value;
       console.log('[ProfileBlock] Authenticated account:', {
@@ -80,7 +94,6 @@ function FriendsFamilyBlock() {
         customerId: customer?.id,
       });
       
-      // Obtener el token de sesión del cliente desde Shopify
       let sessionToken;
       try {
         sessionToken = await shopify.sessionToken.get();
@@ -94,15 +107,10 @@ function FriendsFamilyBlock() {
         throw new Error('Token de sesión no disponible');
       }
       
-      // Llamar a la API de tu aplicación
-      // Nota: Necesitas usar la URL completa de tu aplicación en Vercel
-      // Usar la URL de producción de Vercel (no la URL de deployment específica)
       const appUrl = 'https://shopify-friends-family-app.vercel.app';
       
-      // Build API URL with customer ID if available from authenticatedAccount
       let apiUrl = `${appUrl}/api/customer/group`;
       if (customer?.id) {
-        // Extract numeric customer ID from GID format: gid://shopify/Customer/123456
         const customerIdMatch = customer.id.match(/Customer\/(\d+)/);
         if (customerIdMatch && customerIdMatch[1]) {
           apiUrl += `?customerId=${customerIdMatch[1]}`;
@@ -111,9 +119,6 @@ function FriendsFamilyBlock() {
       }
       
       console.log('[ProfileBlock] Making request to:', apiUrl);
-      console.log('[ProfileBlock] Session token length:', sessionToken?.length || 0);
-      
-      console.log('[ProfileBlock] Fetching from:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -121,7 +126,7 @@ function FriendsFamilyBlock() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
-        credentials: 'include', // Para incluir cookies de autenticación
+        credentials: 'include',
       });
 
       console.log('[ProfileBlock] Response status:', response.status, response.statusText);
@@ -139,7 +144,6 @@ function FriendsFamilyBlock() {
           const errorData = JSON.parse(errorText);
           errorMessage = errorData.error || errorMessage;
         } catch (e) {
-          // Si no es JSON, usar el texto
           errorMessage = errorText || errorMessage;
         }
         
@@ -157,24 +161,101 @@ function FriendsFamilyBlock() {
     }
   }
 
-  if (loading) {
-    return (
-      <s-section heading="Friends & Family">
-        <s-stack direction="block" gap="base">
-          <s-text>Cargando grupos...</s-text>
-        </s-stack>
-      </s-section>
-    );
+  async function fetchGroupDetails(groupId) {
+    try {
+      setLoadingDetails(true);
+      setError(null);
+      
+      const sessionToken = await shopify.sessionToken.get();
+      const appUrl = 'https://shopify-friends-family-app.vercel.app';
+      
+      const response = await fetch(`${appUrl}/api/groups/${groupId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cargar detalles del grupo');
+      }
+
+      const data = await response.json();
+      setGroupDetails(data);
+    } catch (err) {
+      console.error('[ProfileBlock] Error fetching group details:', err);
+      setError(err.message || 'Error al cargar detalles del grupo');
+    } finally {
+      setLoadingDetails(false);
+    }
   }
 
-  if (error) {
-    return (
-      <s-section heading="Friends & Family">
-        <s-banner tone="critical">
-          <s-text>{error}</s-text>
-        </s-banner>
-      </s-section>
-    );
+  async function handleViewDetails(group) {
+    setSelectedGroup(group);
+    setShowInviteForm(false);
+    setInviteEmail('');
+    setInviteError(null);
+    setInviteSuccess(false);
+    await fetchGroupDetails(group.id);
+  }
+
+  async function handleBackToList() {
+    setSelectedGroup(null);
+    setGroupDetails(null);
+    setShowInviteForm(false);
+    setInviteEmail('');
+    setInviteError(null);
+    setInviteSuccess(false);
+    await fetchGroups(); // Refresh groups list
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) {
+      setInviteError('Por favor ingresa un email válido');
+      return;
+    }
+
+    setSendingInvite(true);
+    setInviteError(null);
+    setInviteSuccess(false);
+
+    try {
+      const sessionToken = await shopify.sessionToken.get();
+      const appUrl = 'https://shopify-friends-family-app.vercel.app';
+      
+      const response = await fetch(`${appUrl}/api/invitations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          groupId: selectedGroup.id,
+          email: inviteEmail.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.invitation) {
+        setInviteSuccess(true);
+        setInviteEmail('');
+        setTimeout(() => {
+          setInviteSuccess(false);
+          setShowInviteForm(false);
+        }, 3000);
+      } else {
+        setInviteError(data.error || 'Error al enviar la invitación');
+      }
+    } catch (err) {
+      console.error('[ProfileBlock] Error sending invitation:', err);
+      setInviteError('Error al enviar la invitación. Intenta de nuevo.');
+    } finally {
+      setSendingInvite(false);
+    }
   }
 
   async function createGroup() {
@@ -186,8 +267,13 @@ function FriendsFamilyBlock() {
         setCreateGroupError('El nombre del grupo es requerido');
         return;
       }
+
+      // Check if user already has a group (limit to 1 group per user)
+      if (groups.length > 0) {
+        setCreateGroupError('Ya tienes un grupo activo. Solo puedes tener un grupo a la vez.');
+        return;
+      }
       
-      // Get session token
       const sessionToken = await shopify.sessionToken.get();
       const authenticatedAccount = shopify.authenticatedAccount;
       const customer = authenticatedAccount?.customer?.value;
@@ -195,7 +281,6 @@ function FriendsFamilyBlock() {
       const appUrl = 'https://shopify-friends-family-app.vercel.app';
       let apiUrl = `${appUrl}/api/groups`;
       
-      // Add customer ID to query if available
       if (customer?.id) {
         const customerIdMatch = customer.id.match(/Customer\/(\d+)/);
         if (customerIdMatch && customerIdMatch[1]) {
@@ -213,7 +298,7 @@ function FriendsFamilyBlock() {
         body: JSON.stringify({
           name: groupName.trim(),
           merchantId: 'default',
-          // max_members is now controlled by admin config, not user input
+          // max_members is controlled by backend (user.max_members_per_group or config)
         }),
       });
       
@@ -232,11 +317,9 @@ function FriendsFamilyBlock() {
       const data = await response.json();
       console.log('[ProfileBlock] Group created successfully:', data);
       
-      // Close form and reset
       setShowCreateForm(false);
       setGroupName('');
       
-      // Refresh groups list
       await fetchGroups();
     } catch (err) {
       console.error('[ProfileBlock] Error creating group:', err);
@@ -287,6 +370,141 @@ function FriendsFamilyBlock() {
     }
   }
 
+  if (loading) {
+    return (
+      <s-section heading="Friends & Family">
+        <s-stack direction="block" gap="base">
+          <s-text>Cargando grupos...</s-text>
+        </s-stack>
+      </s-section>
+    );
+  }
+
+  if (error && !selectedGroup) {
+    return (
+      <s-section heading="Friends & Family">
+        <s-banner tone="critical">
+          <s-text>{error}</s-text>
+        </s-banner>
+      </s-section>
+    );
+  }
+
+  // Show group details view
+  if (selectedGroup && groupDetails) {
+    const group = groupDetails.group;
+    const members = groupDetails.members || [];
+    
+    return (
+      <s-section heading="Detalles del Grupo">
+        <s-stack direction="block" gap="base">
+          <s-button 
+            variant="secondary" 
+            onClick={handleBackToList}
+          >
+            ← Volver a la lista
+          </s-button>
+          
+          <s-stack direction="block" gap="small">
+            <s-heading>{group.name}</s-heading>
+            <s-badge tone={group.status === 'active' ? 'success' : 'attention'}>
+              {group.status === 'active' ? 'Activo' : group.status}
+            </s-badge>
+          </s-stack>
+          
+          <s-stack direction="block" gap="small">
+            <s-text>
+              <s-text type="strong">Miembros:</s-text> {group.current_members} / {group.max_members}
+            </s-text>
+            
+            {group.discount_tier && (
+              <s-text>
+                <s-text type="strong">Descuento:</s-text> {group.discount_tier}%
+              </s-text>
+            )}
+            
+            {group.invite_code && (
+              <s-text>
+                <s-text type="strong">Código de invitación:</s-text> {group.invite_code}
+              </s-text>
+            )}
+          </s-stack>
+          
+          {members.length > 0 && (
+            <s-stack direction="block" gap="small">
+              <s-heading>Miembros del Grupo</s-heading>
+              {members.map((member) => (
+                <s-text key={member.id}>
+                  • {member.email} {member.is_owner ? '(Propietario)' : ''}
+                </s-text>
+              ))}
+            </s-stack>
+          )}
+          
+          {!showInviteForm ? (
+            <s-button 
+              variant="primary" 
+              onClick={() => {
+                setShowInviteForm(true);
+                setInviteError(null);
+                setInviteSuccess(false);
+              }}
+            >
+              Invitar a alguien
+            </s-button>
+          ) : (
+            <s-stack direction="block" gap="base">
+              <s-heading>Invitar a un miembro</s-heading>
+              
+              {inviteSuccess && (
+                <s-banner tone="success">
+                  <s-text>¡Invitación enviada exitosamente!</s-text>
+                </s-banner>
+              )}
+              
+              {inviteError && (
+                <s-banner tone="critical">
+                  <s-text>{inviteError}</s-text>
+                </s-banner>
+              )}
+              
+              <s-text-field
+                label="Email del invitado"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="ejemplo@email.com"
+                disabled={sendingInvite}
+              />
+              
+              <s-stack direction="inline" gap="base" alignment="end">
+                <s-button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowInviteForm(false);
+                    setInviteEmail('');
+                    setInviteError(null);
+                    setInviteSuccess(false);
+                  }}
+                  disabled={sendingInvite}
+                >
+                  Cancelar
+                </s-button>
+                <s-button
+                  variant="primary"
+                  onClick={handleInvite}
+                  loading={sendingInvite}
+                >
+                  Enviar Invitación
+                </s-button>
+              </s-stack>
+            </s-stack>
+          )}
+        </s-stack>
+      </s-section>
+    );
+  }
+
   if (groups.length === 0) {
     return (
       <s-section heading="Friends & Family">
@@ -294,7 +512,6 @@ function FriendsFamilyBlock() {
           <s-text>No tienes grupos activos de Friends & Family.</s-text>
           
           {canCreateGroups ? (
-            // User can create groups - show create form
             !showCreateForm ? (
               <s-button 
                 variant="primary" 
@@ -314,6 +531,12 @@ function FriendsFamilyBlock() {
                     <s-banner tone="critical">
                       <s-text>{createGroupError}</s-text>
                     </s-banner>
+                  )}
+                  
+                  {maxMembersPerGroup && (
+                    <s-text appearance="subdued">
+                      Tu grupo podrá tener hasta {maxMembersPerGroup} miembros.
+                    </s-text>
                   )}
                   
                   <s-text-field
@@ -348,7 +571,6 @@ function FriendsFamilyBlock() {
               </s-section>
             )
           ) : (
-            // User cannot create groups - only show join by code
             <s-section>
               <s-stack direction="block" gap="base">
                 <s-heading>Unirse a un Grupo</s-heading>
@@ -417,12 +639,8 @@ function FriendsFamilyBlock() {
               </s-stack>
               
               <s-button 
-                variant="secondary" 
-                onClick={() => {
-                  // Open group management - we'll create a modal for this too
-                  // For now, just show group details
-                  console.log('Managing group:', group.id);
-                }}
+                variant="primary" 
+                onClick={() => handleViewDetails(group)}
               >
                 Ver detalles
               </s-button>
@@ -430,8 +648,7 @@ function FriendsFamilyBlock() {
           </s-section>
         ))}
         
-        {canCreateGroups ? (
-          // User can create groups
+        {canCreateGroups && groups.length === 0 && (
           !showCreateForm ? (
             <s-button 
               variant="primary" 
@@ -451,6 +668,12 @@ function FriendsFamilyBlock() {
                   <s-banner tone="critical">
                     <s-text>{createGroupError}</s-text>
                   </s-banner>
+                )}
+                
+                {maxMembersPerGroup && (
+                  <s-text appearance="subdued">
+                    Tu grupo podrá tener hasta {maxMembersPerGroup} miembros.
+                  </s-text>
                 )}
                 
                 <s-text-field
@@ -484,41 +707,8 @@ function FriendsFamilyBlock() {
               </s-stack>
             </s-section>
           )
-        ) : (
-          // User cannot create groups - show join by code
-          <s-section>
-            <s-stack direction="block" gap="base">
-              <s-heading>Unirse a un Grupo</s-heading>
-              <s-text appearance="subdued">
-                Ingresa el código de invitación que recibiste por email para unirte a un grupo de Friends & Family.
-              </s-text>
-              
-              {error && (
-                <s-banner tone="critical">
-                  <s-text>{error}</s-text>
-                </s-banner>
-              )}
-              
-              <s-text-field
-                label="Código de Invitación"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Ej: ABC12345"
-                disabled={joiningGroup}
-              />
-              
-              <s-button
-                variant="primary"
-                onClick={joinGroupByCode}
-                loading={joiningGroup}
-              >
-                Unirse al Grupo
-              </s-button>
-            </s-stack>
-          </s-section>
         )}
       </s-stack>
     </s-section>
   );
 }
-
