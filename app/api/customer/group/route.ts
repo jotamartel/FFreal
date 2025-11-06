@@ -11,6 +11,24 @@ import { findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
 
 export const dynamic = 'force-dynamic';
 
+// CORS headers for Customer Account Extensions
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+/**
+ * Handle preflight OPTIONS requests
+ */
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { 
+    status: 200, 
+    headers: corsHeaders 
+  });
+}
+
 /**
  * GET /api/customer/group - Get customer's groups (requires authentication)
  * Supports both:
@@ -18,17 +36,6 @@ export const dynamic = 'force-dynamic';
  * 2. Shopify session token (from Authorization header) - for Customer Account Extensions
  */
 export async function GET(request: NextRequest) {
-  // CORS headers for Customer Account Extensions
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-
-  // Handle preflight requests
-  if (request.method === 'OPTIONS') {
-    return new NextResponse(null, { status: 200, headers: corsHeaders });
-  }
 
   try {
     let userId: string | null = null;
@@ -64,7 +71,10 @@ export async function GET(request: NextRequest) {
             console.warn('[GET /api/customer/group] ❌ User not found for Shopify customer ID:', shopifyCustomerId);
             return NextResponse.json(
               { error: 'User not found. Please register first.' },
-              { status: 404 }
+              { 
+                status: 404,
+                headers: corsHeaders,
+              }
             );
           }
         } else {
@@ -82,7 +92,10 @@ export async function GET(request: NextRequest) {
       if (!session) {
         return NextResponse.json(
           { error: 'Unauthorized' },
-          { status: 401 }
+          { 
+            status: 401,
+            headers: corsHeaders,
+          }
         );
       }
       
