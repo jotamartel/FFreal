@@ -35,6 +35,7 @@ interface Group {
 
 export default function GroupsPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<Group[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
