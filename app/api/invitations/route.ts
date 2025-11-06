@@ -69,11 +69,15 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.error('[INVITATION] Error sending invitation email:', err);
+      const error = err as any;
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       
-      // Check if it's a domain verification error
-      if (errorMessage.includes('Domain not verified') || errorMessage.includes('DOMAIN_NOT_VERIFIED')) {
-        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente: ' + group.invite_code;
+      // Check if it's a domain verification error (by code or message)
+      if (error?.code === 'DOMAIN_NOT_VERIFIED' || 
+          errorMessage.includes('Domain not verified') || 
+          errorMessage.includes('DOMAIN_NOT_VERIFIED') ||
+          errorMessage.includes('modo de prueba')) {
+        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente: ' + (group?.invite_code || '');
       } else {
         emailError = errorMessage;
       }

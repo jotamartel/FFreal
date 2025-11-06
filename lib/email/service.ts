@@ -140,8 +140,16 @@ export async function sendInvitationEmail(
 
   if (!result.success) {
     console.error('[EMAIL] Failed to send invitation email:', result.error);
-    // Return the error details for better error handling
-    throw new Error(result.error === 'DOMAIN_NOT_VERIFIED' ? result.message || 'Domain not verified' : result.error || 'Failed to send email');
+    
+    // If it's a domain verification error, throw a specific error type
+    if (result.error === 'DOMAIN_NOT_VERIFIED') {
+      const domainError = new Error(result.message || 'Domain not verified');
+      (domainError as any).code = 'DOMAIN_NOT_VERIFIED';
+      throw domainError;
+    }
+    
+    // For other errors, throw with the error message
+    throw new Error(result.error || 'Failed to send email');
   }
 
   return result.success;
