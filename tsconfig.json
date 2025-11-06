@@ -4,6 +4,9 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./*"]
+    },
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,

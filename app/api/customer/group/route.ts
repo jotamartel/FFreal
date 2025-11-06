@@ -23,11 +23,21 @@ export async function GET(request: NextRequest) {
 
     // Try to get Shopify session token first (for Customer Account Extensions)
     const authHeader = request.headers.get('authorization');
+    console.log('[GET /api/customer/group] Request received:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPreview: authHeader ? authHeader.substring(0, 20) + '...' : null,
+    });
+    
     if (authHeader) {
       const shopifySessionToken = await validateShopifySessionToken(authHeader);
       
       if (shopifySessionToken) {
         const shopifyCustomerId = extractCustomerIdFromToken(shopifySessionToken);
+        
+        console.log('[GET /api/customer/group] Shopify session token processed:', {
+          hasToken: !!shopifySessionToken,
+          customerId: shopifyCustomerId,
+        });
         
         if (shopifyCustomerId) {
           console.log('[GET /api/customer/group] Shopify session token validated, customer ID:', shopifyCustomerId);
@@ -37,14 +47,19 @@ export async function GET(request: NextRequest) {
           
           if (user) {
             userId = user.id;
+            console.log('[GET /api/customer/group] ✅ User found/created, userId:', userId);
           } else {
-            console.warn('[GET /api/customer/group] User not found for Shopify customer ID:', shopifyCustomerId);
+            console.warn('[GET /api/customer/group] ❌ User not found for Shopify customer ID:', shopifyCustomerId);
             return NextResponse.json(
               { error: 'User not found. Please register first.' },
               { status: 404 }
             );
           }
+        } else {
+          console.warn('[GET /api/customer/group] Could not extract customer ID from token');
         }
+      } else {
+        console.warn('[GET /api/customer/group] Shopify session token validation failed');
       }
     }
 

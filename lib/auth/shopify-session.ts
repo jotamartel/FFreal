@@ -1,50 +1,84 @@
 import { shopifyApi } from '@shopify/shopify-api';
-import type { SessionToken } from '@shopify/shopify-api';
+
+let shopifyInstance: ReturnType<typeof shopifyApi> | null = null;
 
 /**
- * Initialize Shopify API client for session token validation
+ * Initialize Shopify API client for session token validation (lazy initialization)
  * Note: For Customer Account Extensions, we need the API secret key to validate tokens
  */
 const getShopifyApi = () => {
-  const apiKey = process.env.SHOPIFY_API_KEY || process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || '7e302a04c4c9857db921e5dca73ddd26';
-  const apiSecretKey = process.env.SHOPIFY_API_SECRET || '';
-  
-  if (!apiSecretKey) {
-    console.warn('[shopify-session] SHOPIFY_API_SECRET not configured, session token validation may fail');
+  if (shopifyInstance) {
+    return shopifyInstance;
   }
 
-  return shopifyApi({
+  const apiKey = process.env.SHOPIFY_API_KEY || process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || '7e302a04c4c9857db921e5dca73ddd26';
+  const apiSecretKey = process.env.SHOPIFY_API_SECRET || '';
+  const hostName = process.env.SHOPIFY_STORE_DOMAIN?.replace('https://', '').replace('http://', '') || 'default.myshopify.com';
+  
+  console.log('[shopify-session] Initializing Shopify API:', {
+    hasApiKey: !!apiKey,
+    apiKeyLength: apiKey.length,
+    hasApiSecretKey: !!apiSecretKey,
+    apiSecretKeyLength: apiSecretKey.length,
+    hostName,
+    hasShopifyStoreDomain: !!process.env.SHOPIFY_STORE_DOMAIN,
+  });
+  
+  if (!apiSecretKey) {
+    console.error('[shopify-session] ❌ SHOPIFY_API_SECRET not configured, session token validation will fail');
+    console.error('[shopify-session] Available env vars:', {
+      has_SHOPIFY_API_KEY: !!process.env.SHOPIFY_API_KEY,
+      has_NEXT_PUBLIC_SHOPIFY_API_KEY: !!process.env.NEXT_PUBLIC_SHOPIFY_API_KEY,
+      has_SHOPIFY_API_SECRET: !!process.env.SHOPIFY_API_SECRET,
+      allKeys: Object.keys(process.env).filter(k => k.includes('SHOPIFY')).join(', '),
+    });
+  }
+
+  shopifyInstance = shopifyApi({
     apiKey,
     apiSecretKey,
-    apiVersion: '2025-10',
+    apiVersion: '2024-10' as any, // Using string format for compatibility
     scopes: process.env.SHOPIFY_SCOPES?.split(',') || ['read_customers', 'write_customers'],
-    hostName: process.env.SHOPIFY_STORE_DOMAIN?.replace('https://', '').replace('http://', '') || '',
+    hostName,
     isEmbeddedApp: true,
   });
-};
 
-const shopify = getShopifyApi();
+  return shopifyInstance;
+};
 
 /**
  * Decode and validate a Shopify session token
  * @param token - The session token from the request header
  * @returns Decoded session token or null if invalid
  */
-export async function validateShopifySessionToken(token: string | null): Promise<SessionToken | null> {
+export async function validateShopifySessionToken(token: string | null): Promise<any | null> {
   if (!token) {
+    console.log('[validateShopifySessionToken] No token provided');
     return null;
   }
 
   try {
     // Remove 'Bearer ' prefix if present
     const cleanToken = token.replace(/^Bearer\s+/i, '');
+    console.log('[validateShopifySessionToken] Attempting to validate token, length:', cleanToken.length);
     
     // Decode and validate the session token
+    const shopify = getShopifyApi();
     const decodedToken = await shopify.session.decodeSessionToken(cleanToken);
     
+    console.log('[validateShopifySessionToken] ✅ Token validated successfully:', {
+      hasSub: !!decodedToken?.sub,
+      sub: decodedToken?.sub,
+      hasDest: !!decodedToken?.dest,
+    });
+    
     return decodedToken;
-  } catch (error) {
-    console.error('[validateShopifySessionToken] Error validating token:', error);
+  } catch (error: any) {
+    console.error('[validateShopifySessionToken] ❌ Error validating token:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     return null;
   }
 }
@@ -54,7 +88,7 @@ export async function validateShopifySessionToken(token: string | null): Promise
  * @param sessionToken - Decoded session token
  * @returns Customer ID (numeric) or null
  */
-export function extractCustomerIdFromToken(sessionToken: SessionToken | null): string | null {
+export function extractCustomerIdFromToken(sessionToken: any | null): string | null {
   if (!sessionToken || !sessionToken.sub) {
     return null;
   }
@@ -73,7 +107,7 @@ export function extractCustomerIdFromToken(sessionToken: SessionToken | null): s
  * @param sessionToken - Decoded session token
  * @returns Shop domain or null
  */
-export function getShopDomainFromToken(sessionToken: SessionToken | null): string | null {
+export function getShopDomainFromToken(sessionToken: any | null): string | null {
   if (!sessionToken || !sessionToken.dest) {
     return null;
   }
