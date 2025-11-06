@@ -228,7 +228,7 @@ function FriendsFamilyBlock() {
               Crear un grupo
             </s-button>
           ) : (
-            <s-card>
+            <s-section>
               <s-stack direction="block" gap="base">
                 <s-heading>Crear Grupo Friends & Family</s-heading>
                 
@@ -282,7 +282,7 @@ function FriendsFamilyBlock() {
                   </s-button>
                 </s-stack>
               </s-stack>
-            </s-card>
+            </s-section>
           )}
         </s-stack>
       </s-section>
@@ -345,7 +345,7 @@ function FriendsFamilyBlock() {
             Crear nuevo grupo
           </s-button>
         ) : (
-          <s-card>
+          <s-section>
             <s-stack direction="block" gap="base">
               <s-heading>Crear Grupo Friends & Family</s-heading>
               
@@ -399,7 +399,7 @@ function FriendsFamilyBlock() {
                 </s-button>
               </s-stack>
             </s-stack>
-          </s-card>
+          </s-section>
         )}
       </s-stack>
     </s-section>
