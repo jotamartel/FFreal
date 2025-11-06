@@ -19,6 +19,7 @@ import {
   EmptyState,
   Spinner,
   InlineGrid,
+  Modal,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n/context';
@@ -56,6 +57,14 @@ export default function UsersManagementPage() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const limit = 20;
+  
+  // Export/Import
+  const [exporting, setExporting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<string>('skip');
+  const [importResult, setImportResult] = useState<any>(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -185,6 +194,15 @@ export default function UsersManagementPage() {
         }}
         secondaryActions={[
           {
+            content: t('users.export'),
+            onAction: () => handleExport('json'),
+            loading: exporting,
+          },
+          {
+            content: t('users.import'),
+            onAction: () => setShowImportModal(true),
+          },
+          {
             content: <LanguageSelector />,
           } as any,
         ]}
@@ -209,9 +227,27 @@ export default function UsersManagementPage() {
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                {t('users.filters')}
-              </Text>
+              <InlineStack gap="400" align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  {t('users.filters')}
+                </Text>
+                <InlineGrid columns={{ xs: 2, sm: 2 }} gap="300">
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleExport('json')}
+                    loading={exporting}
+                  >
+                    {t('users.exportJSON')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleExport('csv')}
+                    loading={exporting}
+                  >
+                    {t('users.exportCSV')}
+                  </Button>
+                </InlineGrid>
+              </InlineStack>
               <InlineStack gap="400" align="space-between">
                 <div style={{ flex: 1 }}>
                   <TextField
@@ -370,6 +406,84 @@ export default function UsersManagementPage() {
           </Card>
         </Layout.Section>
       </Layout>
+
+      {/* Import Modal */}
+      <Modal
+        open={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setImportFile(null);
+          setImportResult(null);
+        }}
+        title={t('users.importTitle')}
+        primaryAction={{
+          content: t('users.import'),
+          onAction: handleImportFile,
+          loading: importing,
+          disabled: !importFile,
+        }}
+        secondaryActions={[
+          {
+            content: t('common.cancel'),
+            onAction: () => {
+              setShowImportModal(false);
+              setImportFile(null);
+              setImportResult(null);
+            },
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              {t('users.importDescription')}
+            </Text>
+
+            <Select
+              label={t('users.importMode')}
+              options={[
+                { label: t('users.importModeSkip'), value: 'skip' },
+                { label: t('users.importModeUpdate'), value: 'update' },
+              ]}
+              value={importMode}
+              onChange={setImportMode}
+              helpText={t('users.importModeHelp')}
+            />
+
+            <input
+              type="file"
+              accept=".json,.csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                setImportFile(file || null);
+              }}
+              style={{ padding: '10px' }}
+            />
+
+            {importResult && (
+              <Banner
+                tone={importResult.success ? 'success' : 'critical'}
+                title={importResult.success ? t('users.importSuccess') : t('users.importFailed')}
+              >
+                {importResult.success ? (
+                  <BlockStack gap="200">
+                    <Text as="p">
+                      {t('users.created')}: {importResult.summary?.created || 0} | {t('users.updated')}: {importResult.summary?.updated || 0} | {t('users.skipped')}: {importResult.summary?.skipped || 0}
+                    </Text>
+                    {importResult.summary?.errors > 0 && (
+                      <Text as="p" tone="subdued">
+                        {t('users.errors')}: {importResult.summary.errors}
+                      </Text>
+                    )}
+                  </BlockStack>
+                ) : (
+                  <Text as="p">{importResult.error || t('users.unknownError')}</Text>
+                )}
+              </Banner>
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Page>
     </PolarisProvider>
   );
