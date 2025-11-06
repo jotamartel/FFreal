@@ -18,6 +18,7 @@ import {
   Checkbox,
   EmptyState,
   Spinner,
+  InlineGrid,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
 
@@ -168,27 +169,6 @@ export default function UsersManagementPage() {
     }
   };
 
-  const rows = users.map((user) => [
-    user.email,
-    user.name || '-',
-    user.role,
-    user.is_active ? 'Activo' : 'Inactivo',
-    user.can_create_groups ? 'Sí' : 'No',
-    user.is_active ? 'Sí' : 'No',
-    user.created_at ? new Date(user.created_at).toLocaleDateString() : '-',
-    user.id, // Store user ID for actions
-  ]);
-
-  const headings = [
-    'Email',
-    'Nombre',
-    'Rol',
-    'Estado',
-    'Puede Crear Grupos',
-    'Activo',
-    'Fecha Creación',
-    'Acciones',
-  ];
 
   return (
     <PolarisProvider>
@@ -299,7 +279,7 @@ export default function UsersManagementPage() {
                           </Badge>
                         </InlineStack>
                         
-                        <InlineStack gap="400" align="space-between">
+                        <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
                           <BlockStack gap="200">
                             <Text as="p" variant="bodyMd">
                               <strong>Puede Crear Grupos:</strong>
@@ -323,7 +303,7 @@ export default function UsersManagementPage() {
                               disabled={saving[user.id]}
                             />
                           </BlockStack>
-                        </InlineStack>
+                        </InlineGrid>
                         
                         {saving[user.id] && (
                           <Text as="p" variant="bodyMd" tone="subdued">
