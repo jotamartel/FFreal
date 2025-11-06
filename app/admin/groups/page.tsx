@@ -19,6 +19,8 @@ import {
   InlineGrid,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 interface Group {
   id: string;
@@ -241,20 +243,20 @@ export default function GroupsPage() {
 
   return (
     <Page
-      title="Grupos Friends & Family / Friends & Family Groups"
-      backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
+      title={t('groups.title')}
+      backAction={{ onAction: () => router.push('/admin'), content: t('common.back') }}
       primaryAction={{
-        content: 'Ver Analíticas / View Analytics',
+        content: t('groups.viewAnalytics'),
         onAction: () => router.push('/admin/analytics'),
       }}
       secondaryActions={[
         {
-          content: 'Exportar / Export',
+          content: t('groups.export'),
           onAction: () => handleExport('json'),
           loading: exporting,
         },
         {
-          content: 'Importar / Import',
+          content: t('groups.import'),
           onAction: () => setShowImportModal(true),
         },
       ]}

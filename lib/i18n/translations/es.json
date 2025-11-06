@@ -1,0 +1,99 @@
+{
+  "common": {
+    "back": "Volver",
+    "reload": "Recargar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "search": "Buscar",
+    "loading": "Cargando...",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "showing": "Mostrando",
+    "of": "de",
+    "all": "Todos",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "dashboard": {
+    "title": "Dashboard Friends & Family",
+    "subtitle": "Gestiona grupos de descuento",
+    "quickAccess": "Acceso Rápido",
+    "groups": {
+      "title": "Grupos",
+      "description": "Gestiona grupos Friends & Family"
+    },
+    "users": {
+      "title": "Usuarios",
+      "description": "Gestiona permisos y acceso de usuarios"
+    },
+    "config": {
+      "title": "Configuración",
+      "description": "Configura niveles y reglas de descuento"
+    },
+    "analytics": {
+      "title": "Analíticas",
+      "description": "Ver estadísticas y métricas de grupos"
+    }
+  },
+  "users": {
+    "title": "Gestión de Usuarios",
+    "filters": "Filtros",
+    "searchPlaceholder": "Email o nombre...",
+    "role": "Rol",
+    "canCreateGroups": "Puede Crear Grupos",
+    "noName": "Sin nombre",
+    "roleOptions": {
+      "all": "Todos",
+      "customer": "Customer",
+      "admin": "Admin"
+    },
+    "permissionOptions": {
+      "all": "Todos",
+      "yes": "Sí",
+      "no": "No"
+    },
+    "noUsersFound": "No se encontraron usuarios",
+    "tryFilters": "Intenta ajustar los filtros o crear un nuevo usuario.",
+    "canCreateGroupsLabel": "Puede Crear Grupos:",
+    "allowCreatingGroups": "Permitir crear grupos de Friends & Family",
+    "accountStatus": "Estado de Cuenta:",
+    "activeUser": "Usuario activo (puede iniciar sesión)",
+    "saving": "Guardando...",
+    "created": "Creado",
+    "lastLogin": "Último acceso",
+    "information": "Información",
+    "canCreateGroupsInfo": "Si está habilitado, el usuario puede crear grupos de Friends & Family. Si está deshabilitado, solo puede unirse a grupos usando códigos de invitación.",
+    "activeInfo": "Controla si el usuario puede iniciar sesión en el sistema."
+  },
+  "groups": {
+    "title": "Grupos Friends & Family",
+    "viewAnalytics": "Ver Analíticas",
+    "export": "Exportar",
+    "import": "Importar"
+  },
+  "config": {
+    "title": "Configuración de Descuentos",
+    "saved": "¡Configuración guardada exitosamente!"
+  },
+  "analytics": {
+    "title": "Analíticas",
+    "totalGroups": "Total Grupos",
+    "totalMembers": "Total Miembros",
+    "avgGroupSize": "Tamaño Promedio",
+    "activeGroups": "Grupos Activos",
+    "groupsByStatus": "Grupos por Estado",
+    "active": "Activo",
+    "activePlural": "Activos",
+    "inactive": "Inactivo",
+    "suspended": "Suspendidos",
+    "terminated": "Terminados",
+    "topGroups": "Top Grupos por Cantidad de Miembros",
+    "noGroups": "Aún no hay grupos.",
+    "groupName": "Nombre del Grupo",
+    "members": "Miembros",
+    "created": "Creado",
+    "noData": "No hay datos de analíticas",
+    "unableToLoad": "No se pudieron cargar los datos de analíticas."
+  }
+}
+

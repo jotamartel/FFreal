@@ -1,8 +1,10 @@
 'use client';
 
-import { Page, Card, Layout, Text, BlockStack, InlineGrid } from '@shopify/polaris';
+import { Page, Card, Layout, Text, BlockStack, InlineGrid, InlineStack } from '@shopify/polaris';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +12,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const [isInShopify, setIsInShopify] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -29,15 +32,20 @@ export default function AdminDashboard() {
 
   return (
     <Page
-      title="Dashboard Friends & Family"
-      subtitle="Gestiona grupos de descuento"
+      title={t('dashboard.title')}
+      subtitle={t('dashboard.subtitle')}
+      secondaryActions={[
+        {
+          content: <LanguageSelector />,
+        },
+      ]}
     >
       <Layout>
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Acceso Rápido
+                {t('dashboard.quickAccess')}
               </Text>
               <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
                 <div
@@ -47,10 +55,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Grupos / Groups
+                        {t('dashboard.groups.title')}
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Gestiona grupos Friends & Family / Manage Friends & Family groups
+                        {t('dashboard.groups.description')}
                       </Text>
                     </BlockStack>
                   </Card>
@@ -62,10 +70,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Usuarios / Users
+                        {t('dashboard.users.title')}
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Gestiona permisos y acceso de usuarios / Manage user permissions and access
+                        {t('dashboard.users.description')}
                       </Text>
                     </BlockStack>
                   </Card>
@@ -77,10 +85,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Configuración / Discount Config
+                        {t('dashboard.config.title')}
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Configura niveles y reglas de descuento / Configure discount tiers and rules
+                        {t('dashboard.config.description')}
                       </Text>
                     </BlockStack>
                   </Card>
@@ -98,10 +106,10 @@ export default function AdminDashboard() {
             <Card>
               <BlockStack gap="200">
                 <Text as="h3" variant="headingSm">
-                  Analíticas / Analytics
+                  {t('dashboard.analytics.title')}
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Ver estadísticas y métricas de grupos / View group statistics and performance metrics
+                  {t('dashboard.analytics.description')}
                 </Text>
               </BlockStack>
             </Card>

@@ -1,0 +1,99 @@
+{
+  "common": {
+    "back": "Back",
+    "reload": "Reload",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "loading": "Loading...",
+    "previous": "Previous",
+    "next": "Next",
+    "showing": "Showing",
+    "of": "of",
+    "all": "All",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "dashboard": {
+    "title": "Friends & Family Dashboard",
+    "subtitle": "Manage discount groups",
+    "quickAccess": "Quick Access",
+    "groups": {
+      "title": "Groups",
+      "description": "Manage Friends & Family groups"
+    },
+    "users": {
+      "title": "Users",
+      "description": "Manage user permissions and access"
+    },
+    "config": {
+      "title": "Discount Config",
+      "description": "Configure discount tiers and rules"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "description": "View group statistics and performance metrics"
+    }
+  },
+  "users": {
+    "title": "User Management",
+    "filters": "Filters",
+    "searchPlaceholder": "Email or name...",
+    "role": "Role",
+    "canCreateGroups": "Can Create Groups",
+    "noName": "No name",
+    "roleOptions": {
+      "all": "All",
+      "customer": "Customer",
+      "admin": "Admin"
+    },
+    "permissionOptions": {
+      "all": "All",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "noUsersFound": "No users found",
+    "tryFilters": "Try adjusting filters or create a new user.",
+    "canCreateGroupsLabel": "Can Create Groups:",
+    "allowCreatingGroups": "Allow creating Friends & Family groups",
+    "accountStatus": "Account Status:",
+    "activeUser": "Active user (can log in)",
+    "saving": "Saving...",
+    "created": "Created",
+    "lastLogin": "Last login",
+    "information": "Information",
+    "canCreateGroupsInfo": "If enabled, the user can create Friends & Family groups. If disabled, they can only join groups using invitation codes.",
+    "activeInfo": "Controls whether the user can log in to the system."
+  },
+  "groups": {
+    "title": "Friends & Family Groups",
+    "viewAnalytics": "View Analytics",
+    "export": "Export",
+    "import": "Import"
+  },
+  "config": {
+    "title": "Discount Configuration",
+    "saved": "Configuration saved successfully!"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "totalGroups": "Total Groups",
+    "totalMembers": "Total Members",
+    "avgGroupSize": "Avg Group Size",
+    "activeGroups": "Active Groups",
+    "groupsByStatus": "Groups by Status",
+    "active": "Active",
+    "activePlural": "Active",
+    "inactive": "Inactive",
+    "suspended": "Suspended",
+    "terminated": "Terminated",
+    "topGroups": "Top Groups by Member Count",
+    "noGroups": "No groups yet.",
+    "groupName": "Group Name",
+    "members": "Members",
+    "created": "Created",
+    "noData": "No analytics data",
+    "unableToLoad": "Unable to load analytics data."
+  }
+}
+

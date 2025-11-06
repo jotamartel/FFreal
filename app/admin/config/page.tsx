@@ -127,9 +127,9 @@ export default function DiscountConfigPage() {
 
   if (loading) {
     return (
-      <Page title="Configuración de Descuentos / Discount Configuration">
+      <Page title={t('config.title')}>
         <Card>
-          <Text as="p">Cargando... / Loading...</Text>
+          <Text as="p">{t('common.loading')}</Text>
         </Card>
       </Page>
     );
@@ -137,14 +137,19 @@ export default function DiscountConfigPage() {
 
   return (
     <Page
-      title="Configuración de Descuentos / Discount Configuration"
-      backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
+      title={t('config.title')}
+      backAction={{ onAction: () => router.push('/admin'), content: t('common.back') }}
+      secondaryActions={[
+        {
+          content: <LanguageSelector />,
+        },
+      ]}
     >
       <Layout>
         {success && (
           <Layout.Section>
             <Banner tone="success" onDismiss={() => setSuccess(false)}>
-              ¡Configuración guardada exitosamente! / Configuration saved successfully!
+              {t('config.saved')}
             </Banner>
           </Layout.Section>
         )}

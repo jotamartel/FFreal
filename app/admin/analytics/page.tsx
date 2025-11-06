@@ -12,6 +12,8 @@ import {
   EmptyState,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 interface Analytics {
   totalGroups: number;
@@ -33,6 +35,7 @@ interface Analytics {
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
@@ -65,9 +68,9 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <Page title="Analíticas / Analytics">
+      <Page title={t('analytics.title')}>
         <Card>
-          <Text as="p">Cargando... / Loading...</Text>
+          <Text as="p">{t('common.loading')}</Text>
         </Card>
       </Page>
     );
@@ -75,17 +78,17 @@ export default function AnalyticsPage() {
 
   if (!analytics) {
     return (
-      <Page title="Analíticas / Analytics">
+      <Page title={t('analytics.title')}>
         <Card>
           <EmptyState
-            heading="No hay datos de analíticas / No analytics data"
+            heading={t('analytics.noData')}
             image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
             action={{
-              content: 'Recargar / Refresh',
+              content: t('common.reload'),
               onAction: loadAnalytics,
             }}
           >
-            <Text as="p">No se pudieron cargar los datos de analíticas. / Unable to load analytics data.</Text>
+            <Text as="p">{t('analytics.unableToLoad')}</Text>
           </EmptyState>
         </Card>
       </Page>
@@ -100,8 +103,13 @@ export default function AnalyticsPage() {
 
   return (
     <Page
-      title="Analíticas / Analytics"
-      backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
+      title={t('analytics.title')}
+      backAction={{ onAction: () => router.push('/admin'), content: t('common.back') }}
+      secondaryActions={[
+        {
+          content: <LanguageSelector />,
+        },
+      ]}
     >
       <Layout>
         <Layout.Section>
@@ -109,7 +117,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Total Grupos / Total Groups
+                  {t('analytics.totalGroups')}
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.totalGroups}
@@ -120,7 +128,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Total Miembros / Total Members
+                  {t('analytics.totalMembers')}
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.totalMembers}
@@ -131,7 +139,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Tamaño Promedio / Avg Group Size
+                  {t('analytics.avgGroupSize')}
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.averageGroupSize.toFixed(1)}
@@ -142,7 +150,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Grupos Activos / Active Groups
+                  {t('analytics.activeGroups')}
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.groupsByStatus.active || 0}
@@ -156,17 +164,17 @@ export default function AnalyticsPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Grupos por Estado / Groups by Status
+                {t('analytics.groupsByStatus')}
               </Text>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd">
-                  Activos / Active: <strong>{analytics.groupsByStatus.active || 0}</strong>
+                  {t('analytics.activePlural')}: <strong>{analytics.groupsByStatus.active || 0}</strong>
                 </Text>
                 <Text as="p" variant="bodyMd">
-                  Suspendidos / Suspended: <strong>{analytics.groupsByStatus.suspended || 0}</strong>
+                  {t('analytics.suspended')}: <strong>{analytics.groupsByStatus.suspended || 0}</strong>
                 </Text>
                 <Text as="p" variant="bodyMd">
-                  Terminados / Terminated: <strong>{analytics.groupsByStatus.terminated || 0}</strong>
+                  {t('analytics.terminated')}: <strong>{analytics.groupsByStatus.terminated || 0}</strong>
                 </Text>
               </BlockStack>
             </BlockStack>
@@ -177,16 +185,16 @@ export default function AnalyticsPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Top Grupos por Cantidad de Miembros / Top Groups by Member Count
+                {t('analytics.topGroups')}
               </Text>
               {analytics.topGroups.length === 0 ? (
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Aún no hay grupos. / No groups yet.
+                  {t('analytics.noGroups')}
                 </Text>
               ) : (
                 <DataTable
                   columnContentTypes={['text', 'text', 'text']}
-                  headings={['Nombre del Grupo / Group Name', 'Miembros / Members', 'Creado / Created']}
+                  headings={[t('analytics.groupName'), t('analytics.members'), t('analytics.created')]}
                   rows={topGroupsRows}
                 />
               )}

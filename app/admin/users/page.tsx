@@ -21,6 +21,8 @@ import {
   InlineGrid,
 } from '@shopify/polaris';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageSelector } from '@/components/admin/LanguageSelector';
 
 interface User {
   id: string;
@@ -38,6 +40,7 @@ interface User {
 
 export default function UsersManagementPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
@@ -173,13 +176,18 @@ export default function UsersManagementPage() {
   return (
     <PolarisProvider>
       <Page
-        title="Gestión de Usuarios / User Management"
-        backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
+        title={t('users.title')}
+        backAction={{ onAction: () => router.push('/admin'), content: t('common.back') }}
         primaryAction={{
-          content: 'Recargar / Reload',
+          content: t('common.reload'),
           onAction: loadUsers,
           loading: loading,
         }}
+        secondaryActions={[
+          {
+            content: <LanguageSelector />,
+          },
+        ]}
       >
       <Layout>
         {error && (
@@ -202,25 +210,25 @@ export default function UsersManagementPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Filtros / Filters
+                {t('users.filters')}
               </Text>
               <InlineStack gap="400" align="space-between">
                 <div style={{ flex: 1 }}>
                   <TextField
-                    label="Buscar / Search"
+                    label={t('common.search')}
                     value={search}
                     onChange={setSearch}
-                    placeholder="Email o nombre... / Email or name..."
+                    placeholder={t('users.searchPlaceholder')}
                     autoComplete="off"
                   />
                 </div>
                 <div style={{ width: '200px' }}>
                   <Select
-                    label="Rol / Role"
+                    label={t('users.role')}
                     options={[
-                      { label: 'Todos / All', value: 'all' },
-                      { label: 'Customer / Customer', value: 'customer' },
-                      { label: 'Admin / Admin', value: 'admin' },
+                      { label: t('users.roleOptions.all'), value: 'all' },
+                      { label: t('users.roleOptions.customer'), value: 'customer' },
+                      { label: t('users.roleOptions.admin'), value: 'admin' },
                     ]}
                     value={roleFilter}
                     onChange={setRoleFilter}
@@ -228,11 +236,11 @@ export default function UsersManagementPage() {
                 </div>
                 <div style={{ width: '250px' }}>
                   <Select
-                    label="Puede Crear Grupos / Can Create Groups"
+                    label={t('users.canCreateGroups')}
                     options={[
-                      { label: 'Todos / All', value: 'all' },
-                      { label: 'Sí / Yes', value: 'true' },
-                      { label: 'No / No', value: 'false' },
+                      { label: t('users.permissionOptions.all'), value: 'all' },
+                      { label: t('users.permissionOptions.yes'), value: 'true' },
+                      { label: t('users.permissionOptions.no'), value: 'false' },
                     ]}
                     value={canCreateGroupsFilter}
                     onChange={setCanCreateGroupsFilter}
@@ -251,14 +259,14 @@ export default function UsersManagementPage() {
               </div>
             ) : users.length === 0 ? (
               <EmptyState
-                heading="No se encontraron usuarios / No users found"
+                heading={t('users.noUsersFound')}
                 image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
                 action={{
-                  content: 'Recargar / Reload',
+                  content: t('common.reload'),
                   onAction: loadUsers,
                 }}
               >
-                <p>Intenta ajustar los filtros o crear un nuevo usuario. / Try adjusting filters or create a new user.</p>
+                <p>{t('users.tryFilters')}</p>
               </EmptyState>
             ) : (
               <>
@@ -272,21 +280,21 @@ export default function UsersManagementPage() {
                               {user.email}
                             </Text>
                             <Text as="p" variant="bodyMd" tone="subdued">
-                              {user.name || 'Sin nombre'} • {user.role}
+                              {user.name || t('users.noName')} • {user.role}
                             </Text>
                           </BlockStack>
                           <Badge tone={user.is_active ? 'success' : 'attention'}>
-                            {user.is_active ? 'Activo' : 'Inactivo'}
+                            {user.is_active ? t('analytics.active') : t('analytics.inactive')}
                           </Badge>
                         </InlineStack>
                         
                         <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
                           <BlockStack gap="200">
                             <Text as="p" variant="bodyMd">
-                              <strong>Puede Crear Grupos / Can Create Groups:</strong>
+                              <strong>{t('users.canCreateGroupsLabel')}</strong>
                             </Text>
                             <Checkbox
-                              label="Permitir crear grupos de Friends & Family / Allow creating Friends & Family groups"
+                              label={t('users.allowCreatingGroups')}
                               checked={user.can_create_groups === true}
                               onChange={() => handleTogglePermission(user.id, user.can_create_groups)}
                               disabled={saving[user.id]}
@@ -295,10 +303,10 @@ export default function UsersManagementPage() {
                           
                           <BlockStack gap="200">
                             <Text as="p" variant="bodyMd">
-                              <strong>Estado de Cuenta / Account Status:</strong>
+                              <strong>{t('users.accountStatus')}</strong>
                             </Text>
                             <Checkbox
-                              label="Usuario activo (puede iniciar sesión) / Active user (can log in)"
+                              label={t('users.activeUser')}
                               checked={user.is_active}
                               onChange={() => handleToggleActive(user.id, user.is_active)}
                               disabled={saving[user.id]}
@@ -308,13 +316,13 @@ export default function UsersManagementPage() {
                         
                         {saving[user.id] && (
                           <Text as="p" variant="bodyMd" tone="subdued">
-                            Guardando... / Saving...
+                            {t('users.saving')}
                           </Text>
                         )}
                         
                         <Text as="p" variant="bodyMd" tone="subdued">
-                          Creado / Created: {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
-                          {user.last_login_at && ` • Último acceso / Last login: ${new Date(user.last_login_at).toLocaleDateString()}`}
+                          {t('users.created')}: {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                          {user.last_login_at && ` • ${t('users.lastLogin')}: ${new Date(user.last_login_at).toLocaleDateString()}`}
                         </Text>
                       </BlockStack>
                     </Card>
@@ -327,16 +335,16 @@ export default function UsersManagementPage() {
                         onClick={() => setOffset(Math.max(0, offset - limit))}
                         disabled={offset === 0}
                       >
-                        Anterior / Previous
+                        {t('common.previous')}
                       </Button>
                       <Text as="p" variant="bodyMd">
-                        Mostrando / Showing {offset + 1}-{Math.min(offset + limit, total)} de / of {total}
+                        {t('common.showing')} {offset + 1}-{Math.min(offset + limit, total)} {t('common.of')} {total}
                       </Text>
                       <Button
                         onClick={() => setOffset(offset + limit)}
                         disabled={offset + limit >= total}
                       >
-                        Siguiente / Next
+                        {t('common.next')}
                       </Button>
                     </InlineStack>
                   </div>
@@ -350,17 +358,13 @@ export default function UsersManagementPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h3" variant="headingMd">
-                Información / Information
+                {t('users.information')}
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                <strong>Puede Crear Grupos / Can Create Groups:</strong> Si está habilitado, el usuario puede crear
-                grupos de Friends & Family. Si está deshabilitado, solo puede unirse a grupos
-                usando códigos de invitación. / If enabled, the user can create Friends & Family groups. 
-                If disabled, they can only join groups using invitation codes.
+                <strong>{t('users.canCreateGroupsLabel')}</strong> {t('users.canCreateGroupsInfo')}
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                <strong>Activo / Active:</strong> Controla si el usuario puede iniciar sesión en el sistema. / 
-                Controls whether the user can log in to the system.
+                <strong>{t('analytics.active')}:</strong> {t('users.activeInfo')}
               </Text>
             </BlockStack>
           </Card>
