@@ -35,9 +35,15 @@ export async function POST(request: NextRequest) {
     // Send invitation email
     let emailSent = false;
     let emailError: string | null = null;
+    let inviteCode: string | null = null;
+    
+    // Get group info first (needed for error messages)
+    const group = await getGroupById(groupId);
+    if (group) {
+      inviteCode = group.invite_code;
+    }
     
     try {
-      const group = await getGroupById(groupId);
       if (group) {
         // Get redirect URL from config, or use default
         const { getDiscountConfig } = await import('@/lib/database/ff-groups');
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
           errorMessage.includes('Domain not verified') || 
           errorMessage.includes('DOMAIN_NOT_VERIFIED') ||
           errorMessage.includes('modo de prueba')) {
-        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente: ' + (group?.invite_code || '');
+        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente: ' + (inviteCode || '');
       } else {
         emailError = errorMessage;
       }
