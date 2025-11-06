@@ -293,7 +293,7 @@ function FriendsFamilyBlock() {
     <s-section heading="Friends & Family">
       <s-stack direction="block" gap="base">
         {groups.map((group) => (
-          <s-card key={group.id}>
+          <s-section key={group.id}>
             <s-stack direction="block" gap="small">
               <s-stack direction="inline" justifyContent="space-between" alignItems="center">
                 <s-heading>{group.name}</s-heading>
@@ -331,7 +331,7 @@ function FriendsFamilyBlock() {
                 Ver detalles
               </s-button>
             </s-stack>
-          </s-card>
+          </s-section>
         ))}
         
         {!showCreateForm ? (
