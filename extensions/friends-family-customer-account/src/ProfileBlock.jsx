@@ -38,8 +38,12 @@ function FriendsFamilyBlock() {
       
       // Llamar a la API de tu aplicación
       // Nota: Necesitas usar la URL completa de tu aplicación en Vercel
+      // Usar la URL de producción de Vercel (no la URL de deployment específica)
       const appUrl = 'https://shopify-friends-family-app.vercel.app';
       const apiUrl = `${appUrl}/api/customer/group`;
+      
+      console.log('[ProfileBlock] Making request to:', apiUrl);
+      console.log('[ProfileBlock] Session token length:', sessionToken?.length || 0);
       
       console.log('[ProfileBlock] Fetching from:', apiUrl);
       
