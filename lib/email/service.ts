@@ -8,19 +8,48 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-// Initialize SMTP transporter if SMTP is configured
+// Lazy initialization of SMTP transporter (to avoid Edge Runtime issues)
 let smtpTransporter: nodemailer.Transporter | null = null;
 
-if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-  smtpTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
+function getSMTPTransporter(): nodemailer.Transporter | null {
+  // Check if already initialized
+  if (smtpTransporter) {
+    return smtpTransporter;
+  }
+
+  // Check if SMTP is configured
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    return null;
+  }
+
+  // Initialize transporter
+  try {
+    smtpTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+      // Add connection timeout
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+    });
+
+    console.log('[EMAIL] SMTP transporter initialized:', {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT || '587',
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER?.substring(0, 3) + '***',
+    });
+
+    return smtpTransporter;
+  } catch (error: any) {
+    console.error('[EMAIL] Error initializing SMTP transporter:', error);
+    return null;
+  }
 }
 
 export interface EmailOptions {
@@ -34,8 +63,10 @@ export interface EmailOptions {
  * Send email using SMTP (Gmail, Outlook, etc.)
  */
 async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
-  if (!smtpTransporter) {
-    return { success: false, error: 'SMTP not configured' };
+  const transporter = getSMTPTransporter();
+  
+  if (!transporter) {
+    return { success: false, error: 'SMTP not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD.' };
   }
 
   try {
@@ -50,26 +81,65 @@ async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boole
       from: fromEmail,
       subject: options.subject,
       host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT || '587',
+      secure: process.env.SMTP_SECURE === 'true',
     });
 
-    const info = await smtpTransporter.sendMail({
+    // Verify connection first
+    try {
+      await transporter.verify();
+      console.log('[EMAIL] ✅ SMTP connection verified');
+    } catch (verifyError: any) {
+      console.error('[EMAIL] ❌ SMTP connection verification failed:', {
+        error: verifyError.message,
+        code: verifyError.code,
+        command: verifyError.command,
+      });
+      return { 
+        success: false, 
+        error: `SMTP connection failed: ${verifyError.message || 'Unknown error'}` 
+      };
+    }
+
+    const info = await transporter.sendMail({
       from: fromEmail,
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
 
-    console.log('[EMAIL] Email sent via SMTP:', {
+    console.log('[EMAIL] ✅ Email sent via SMTP:', {
       messageId: info.messageId,
       to: options.to,
+      from: fromEmail,
     });
 
     return { success: true, message: info.messageId };
   } catch (error: any) {
-    console.error('[EMAIL] SMTP error:', error);
+    console.error('[EMAIL] ❌ SMTP error:', {
+      error: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack?.substring(0, 500),
+    });
+    
+    let errorMessage = error.message || 'Failed to send email via SMTP';
+    
+    // Provide more specific error messages
+    if (error.code === 'EAUTH') {
+      errorMessage = 'SMTP authentication failed. Check SMTP_USER and SMTP_PASSWORD.';
+    } else if (error.code === 'ECONNECTION') {
+      errorMessage = `SMTP connection failed. Check SMTP_HOST (${process.env.SMTP_HOST}) and SMTP_PORT (${process.env.SMTP_PORT || '587'}).`;
+    } else if (error.code === 'ETIMEDOUT') {
+      errorMessage = 'SMTP connection timeout. Check your network and SMTP settings.';
+    }
+    
     return { 
       success: false, 
-      error: error.message || 'Failed to send email via SMTP' 
+      error: errorMessage,
+      code: error.code,
     };
   }
 }
@@ -142,14 +212,17 @@ async function sendEmailViaResend(options: EmailOptions): Promise<{ success: boo
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     // Priority: SMTP if configured, then Resend
-    if (smtpTransporter) {
+    const transporter = getSMTPTransporter();
+    if (transporter) {
       console.log('[EMAIL] Using SMTP transport');
       const result = await sendEmailViaSMTP(options);
       if (result.success) {
         return result;
       }
       // If SMTP fails, fallback to Resend if available
-      console.warn('[EMAIL] SMTP failed, trying Resend as fallback');
+      console.warn('[EMAIL] SMTP failed, trying Resend as fallback:', result.error);
+    } else {
+      console.log('[EMAIL] SMTP not configured, checking Resend...');
     }
 
     // Try Resend if SMTP is not configured or failed
@@ -159,7 +232,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     }
 
     // No email service configured
-    const errorMsg = 'No email service configured. Configure either SMTP or RESEND_API_KEY.';
+    const errorMsg = 'No email service configured. Configure either SMTP (SMTP_HOST, SMTP_USER, SMTP_PASSWORD) or RESEND_API_KEY.';
     console.error('[EMAIL]', errorMsg);
     return { success: false, error: errorMsg };
   } catch (error: any) {
