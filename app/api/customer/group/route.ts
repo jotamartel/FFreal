@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     console.log('[GET /api/customer/group] Request received:', {
       hasAuthHeader: !!authHeader,
       authHeaderPreview: authHeader ? authHeader.substring(0, 30) + '...' : null,
-      allHeaders: Object.fromEntries(request.headers.entries()),
+      allHeaders: Object.fromEntries ? Object.fromEntries(request.headers.entries()) : {},
     });
     
     if (authHeader) {
