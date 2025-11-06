@@ -61,23 +61,33 @@ export async function validateShopifySessionToken(token: string | null): Promise
     // Remove 'Bearer ' prefix if present
     const cleanToken = token.replace(/^Bearer\s+/i, '');
     console.log('[validateShopifySessionToken] Attempting to validate token, length:', cleanToken.length);
+    console.log('[validateShopifySessionToken] Token preview:', cleanToken.substring(0, 50) + '...');
     
     // Decode and validate the session token
     const shopify = getShopifyApi();
+    console.log('[validateShopifySessionToken] Shopify API instance created, calling decodeSessionToken...');
+    
     const decodedToken = await shopify.session.decodeSessionToken(cleanToken);
     
     console.log('[validateShopifySessionToken] ✅ Token validated successfully:', {
       hasSub: !!decodedToken?.sub,
       sub: decodedToken?.sub,
       hasDest: !!decodedToken?.dest,
+      dest: decodedToken?.dest,
+      aud: decodedToken?.aud,
+      iss: decodedToken?.iss,
     });
     
     return decodedToken;
   } catch (error: any) {
     console.error('[validateShopifySessionToken] ❌ Error validating token:', {
       error: error.message,
-      stack: error.stack,
-      name: error.name,
+      errorName: error.name,
+      errorCode: error.code,
+      stack: error.stack?.substring(0, 500), // Limit stack trace
+      hasShopifyApi: !!getShopifyApi(),
+      apiSecretConfigured: !!process.env.SHOPIFY_API_SECRET,
+      apiSecretLength: process.env.SHOPIFY_API_SECRET?.length || 0,
     });
     return null;
   }
