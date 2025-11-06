@@ -65,9 +65,9 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <Page title="Analytics">
+      <Page title="Analíticas / Analytics">
         <Card>
-          <Text as="p">Loading...</Text>
+          <Text as="p">Cargando... / Loading...</Text>
         </Card>
       </Page>
     );
@@ -75,17 +75,17 @@ export default function AnalyticsPage() {
 
   if (!analytics) {
     return (
-      <Page title="Analytics">
+      <Page title="Analíticas / Analytics">
         <Card>
           <EmptyState
-            heading="No analytics data"
+            heading="No hay datos de analíticas / No analytics data"
             image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
             action={{
-              content: 'Refresh',
+              content: 'Recargar / Refresh',
               onAction: loadAnalytics,
             }}
           >
-            <Text as="p">Unable to load analytics data.</Text>
+            <Text as="p">No se pudieron cargar los datos de analíticas. / Unable to load analytics data.</Text>
           </EmptyState>
         </Card>
       </Page>
@@ -100,8 +100,8 @@ export default function AnalyticsPage() {
 
   return (
     <Page
-      title="Analytics"
-      backAction={{ onAction: () => router.push('/admin') }}
+      title="Analíticas / Analytics"
+      backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
     >
       <Layout>
         <Layout.Section>
@@ -109,7 +109,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Total Groups
+                  Total Grupos / Total Groups
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.totalGroups}
@@ -120,7 +120,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Total Members
+                  Total Miembros / Total Members
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.totalMembers}
@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Avg Group Size
+                  Tamaño Promedio / Avg Group Size
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.averageGroupSize.toFixed(1)}
@@ -142,7 +142,7 @@ export default function AnalyticsPage() {
             <Card>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  Active Groups
+                  Grupos Activos / Active Groups
                 </Text>
                 <Text as="h2" variant="heading2xl">
                   {analytics.groupsByStatus.active || 0}
@@ -156,17 +156,17 @@ export default function AnalyticsPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Groups by Status
+                Grupos por Estado / Groups by Status
               </Text>
               <BlockStack gap="200">
                 <Text as="p" variant="bodyMd">
-                  Active: <strong>{analytics.groupsByStatus.active || 0}</strong>
+                  Activos / Active: <strong>{analytics.groupsByStatus.active || 0}</strong>
                 </Text>
                 <Text as="p" variant="bodyMd">
-                  Suspended: <strong>{analytics.groupsByStatus.suspended || 0}</strong>
+                  Suspendidos / Suspended: <strong>{analytics.groupsByStatus.suspended || 0}</strong>
                 </Text>
                 <Text as="p" variant="bodyMd">
-                  Terminated: <strong>{analytics.groupsByStatus.terminated || 0}</strong>
+                  Terminados / Terminated: <strong>{analytics.groupsByStatus.terminated || 0}</strong>
                 </Text>
               </BlockStack>
             </BlockStack>
@@ -177,16 +177,16 @@ export default function AnalyticsPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Top Groups by Member Count
+                Top Grupos por Cantidad de Miembros / Top Groups by Member Count
               </Text>
               {analytics.topGroups.length === 0 ? (
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  No groups yet.
+                  Aún no hay grupos. / No groups yet.
                 </Text>
               ) : (
                 <DataTable
                   columnContentTypes={['text', 'text', 'text']}
-                  headings={['Group Name', 'Members', 'Created']}
+                  headings={['Nombre del Grupo / Group Name', 'Miembros / Members', 'Creado / Created']}
                   rows={topGroupsRows}
                 />
               )}

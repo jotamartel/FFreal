@@ -241,20 +241,20 @@ export default function GroupsPage() {
 
   return (
     <Page
-      title="Friends & Family Groups"
-      backAction={{ onAction: () => router.push('/admin') }}
+      title="Grupos Friends & Family / Friends & Family Groups"
+      backAction={{ onAction: () => router.push('/admin'), content: 'Volver / Back' }}
       primaryAction={{
-        content: 'View Analytics',
+        content: 'Ver Analíticas / View Analytics',
         onAction: () => router.push('/admin/analytics'),
       }}
       secondaryActions={[
         {
-          content: 'Export',
+          content: 'Exportar / Export',
           onAction: () => handleExport('json'),
           loading: exporting,
         },
         {
-          content: 'Import',
+          content: 'Importar / Import',
           onAction: () => setShowImportModal(true),
         },
       ]}

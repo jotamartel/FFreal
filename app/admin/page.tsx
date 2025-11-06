@@ -29,15 +29,15 @@ export default function AdminDashboard() {
 
   return (
     <Page
-      title="Friends & Family Dashboard"
-      subtitle="Manage discount groups"
+      title="Dashboard Friends & Family"
+      subtitle="Gestiona grupos de descuento"
     >
       <Layout>
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
-                Quick Access
+                Acceso Rápido
               </Text>
               <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
                 <div
@@ -47,10 +47,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Groups
+                        Grupos / Groups
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Manage Friends & Family groups
+                        Gestiona grupos Friends & Family / Manage Friends & Family groups
                       </Text>
                     </BlockStack>
                   </Card>
@@ -62,10 +62,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Users
+                        Usuarios / Users
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Manage user permissions and access
+                        Gestiona permisos y acceso de usuarios / Manage user permissions and access
                       </Text>
                     </BlockStack>
                   </Card>
@@ -77,10 +77,10 @@ export default function AdminDashboard() {
                   <Card>
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Discount Config
+                        Configuración / Discount Config
                       </Text>
                       <Text as="p" variant="bodyMd" tone="subdued">
-                        Configure discount tiers and rules
+                        Configura niveles y reglas de descuento / Configure discount tiers and rules
                       </Text>
                     </BlockStack>
                   </Card>
@@ -98,10 +98,10 @@ export default function AdminDashboard() {
             <Card>
               <BlockStack gap="200">
                 <Text as="h3" variant="headingSm">
-                  Analytics
+                  Analíticas / Analytics
                 </Text>
                 <Text as="p" variant="bodyMd" tone="subdued">
-                  View group statistics and performance metrics
+                  Ver estadísticas y métricas de grupos / View group statistics and performance metrics
                 </Text>
               </BlockStack>
             </Card>
