@@ -22,6 +22,14 @@ function FriendsFamilyBlock() {
       
       console.log('[ProfileBlock] Starting to fetch groups...');
       
+      // Verificar si hay una cuenta autenticada
+      const authenticatedAccount = shopify.authenticatedAccount;
+      console.log('[ProfileBlock] Authenticated account:', {
+        hasAccount: !!authenticatedAccount,
+        customerId: authenticatedAccount?.customerId,
+        customerGid: authenticatedAccount?.customerGid,
+      });
+      
       // Obtener el token de sesión del cliente desde Shopify
       let sessionToken;
       try {
@@ -40,7 +48,17 @@ function FriendsFamilyBlock() {
       // Nota: Necesitas usar la URL completa de tu aplicación en Vercel
       // Usar la URL de producción de Vercel (no la URL de deployment específica)
       const appUrl = 'https://shopify-friends-family-app.vercel.app';
-      const apiUrl = `${appUrl}/api/customer/group`;
+      
+      // Build API URL with customer ID if available from authenticatedAccount
+      let apiUrl = `${appUrl}/api/customer/group`;
+      if (authenticatedAccount?.customerGid) {
+        // Extract numeric customer ID from GID format: gid://shopify/Customer/123456
+        const customerIdMatch = authenticatedAccount.customerGid.match(/Customer\/(\d+)/);
+        if (customerIdMatch && customerIdMatch[1]) {
+          apiUrl += `?customerId=${customerIdMatch[1]}`;
+          console.log('[ProfileBlock] Using customer ID from authenticatedAccount:', customerIdMatch[1]);
+        }
+      }
       
       console.log('[ProfileBlock] Making request to:', apiUrl);
       console.log('[ProfileBlock] Session token length:', sessionToken?.length || 0);

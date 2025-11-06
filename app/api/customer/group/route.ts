@@ -87,6 +87,9 @@ export async function GET(request: NextRequest) {
               );
             }
           } else {
+            // Token is valid but doesn't have customer ID
+            // Try to extract customer ID from the token's dest or other fields
+            // For now, we'll return a helpful error message
             console.warn('[GET /api/customer/group] Could not extract customer ID from token. Token structure:', {
               sub: shopifySessionToken?.sub,
               hasSub: !!shopifySessionToken?.sub,
@@ -98,6 +101,9 @@ export async function GET(request: NextRequest) {
             console.warn('[GET /api/customer/group]   1. Customer is not logged in to their account');
             console.warn('[GET /api/customer/group]   2. App does not have read_customers permission');
             console.warn('[GET /api/customer/group]   3. Token is from checkout context instead of customer account');
+            
+            // Note: The 'sub' claim is optional and only present when customer is logged in
+            // We'll return a more specific error in the response below
           }
         } else {
           console.warn('[GET /api/customer/group] Shopify session token validation failed. Token present but invalid.');
@@ -110,10 +116,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fallback to JWT session if no Shopify token or if Shopify token didn't work
-    if (!userId) {
-      // If we have a Shopify token but no customer ID, provide a helpful error
-      if (authHeader) {
+    // If we have a Shopify token but no customer ID, try to get it from query params
+    // (This is passed from the extension using authenticatedAccount)
+    if (!userId && authHeader) {
+      const { searchParams } = new URL(request.url);
+      const customerIdFromQuery = searchParams.get('customerId');
+      
+      if (customerIdFromQuery) {
+        console.log('[GET /api/customer/group] Using customer ID from query parameter:', customerIdFromQuery);
+        
+        // Find or create user by Shopify customer ID
+        const user = await findOrCreateUserByShopifyCustomerId(customerIdFromQuery);
+        
+        if (user) {
+          userId = user.id;
+          console.log('[GET /api/customer/group] ✅ User found/created from query param, userId:', userId);
+        } else {
+          console.warn('[GET /api/customer/group] ❌ User not found for Shopify customer ID from query:', customerIdFromQuery);
+          return NextResponse.json(
+            { error: 'User not found. Please register first.' },
+            { 
+              status: 404,
+              headers: corsHeaders,
+            }
+          );
+        }
+      } else {
+        // No customer ID in query, token doesn't have sub claim
         return NextResponse.json(
           { 
             error: 'Customer not authenticated',
@@ -126,7 +155,10 @@ export async function GET(request: NextRequest) {
           }
         );
       }
-      
+    }
+
+    // Fallback to JWT session if no Shopify token or if Shopify token didn't work
+    if (!userId) {
       // Try JWT session as fallback
       const session = await getSession();
       
