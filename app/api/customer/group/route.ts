@@ -49,44 +49,57 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     console.log('[GET /api/customer/group] Request received:', {
       hasAuthHeader: !!authHeader,
-      authHeaderPreview: authHeader ? authHeader.substring(0, 20) + '...' : null,
+      authHeaderPreview: authHeader ? authHeader.substring(0, 30) + '...' : null,
+      allHeaders: Object.fromEntries(request.headers.entries()),
     });
     
     if (authHeader) {
-      const shopifySessionToken = await validateShopifySessionToken(authHeader);
-      
-      if (shopifySessionToken) {
-        const shopifyCustomerId = extractCustomerIdFromToken(shopifySessionToken);
+      try {
+        const shopifySessionToken = await validateShopifySessionToken(authHeader);
         
-        console.log('[GET /api/customer/group] Shopify session token processed:', {
-          hasToken: !!shopifySessionToken,
-          customerId: shopifyCustomerId,
-        });
-        
-        if (shopifyCustomerId) {
-          console.log('[GET /api/customer/group] Shopify session token validated, customer ID:', shopifyCustomerId);
+        if (shopifySessionToken) {
+          const shopifyCustomerId = extractCustomerIdFromToken(shopifySessionToken);
           
-          // Find or create user by Shopify customer ID
-          const user = await findOrCreateUserByShopifyCustomerId(shopifyCustomerId);
+          console.log('[GET /api/customer/group] Shopify session token processed:', {
+            hasToken: !!shopifySessionToken,
+            customerId: shopifyCustomerId,
+            tokenSub: shopifySessionToken?.sub,
+            tokenDest: shopifySessionToken?.dest,
+          });
           
-          if (user) {
-            userId = user.id;
-            console.log('[GET /api/customer/group] ✅ User found/created, userId:', userId);
+          if (shopifyCustomerId) {
+            console.log('[GET /api/customer/group] Shopify session token validated, customer ID:', shopifyCustomerId);
+            
+            // Find or create user by Shopify customer ID
+            const user = await findOrCreateUserByShopifyCustomerId(shopifyCustomerId);
+            
+            if (user) {
+              userId = user.id;
+              console.log('[GET /api/customer/group] ✅ User found/created, userId:', userId);
+            } else {
+              console.warn('[GET /api/customer/group] ❌ User not found for Shopify customer ID:', shopifyCustomerId);
+              return NextResponse.json(
+                { error: 'User not found. Please register first.' },
+                { 
+                  status: 404,
+                  headers: corsHeaders,
+                }
+              );
+            }
           } else {
-            console.warn('[GET /api/customer/group] ❌ User not found for Shopify customer ID:', shopifyCustomerId);
-            return NextResponse.json(
-              { error: 'User not found. Please register first.' },
-              { 
-                status: 404,
-                headers: corsHeaders,
-              }
-            );
+            console.warn('[GET /api/customer/group] Could not extract customer ID from token. Token structure:', {
+              sub: shopifySessionToken?.sub,
+              hasSub: !!shopifySessionToken?.sub,
+            });
           }
         } else {
-          console.warn('[GET /api/customer/group] Could not extract customer ID from token');
+          console.warn('[GET /api/customer/group] Shopify session token validation failed. Token present but invalid.');
         }
-      } else {
-        console.warn('[GET /api/customer/group] Shopify session token validation failed');
+      } catch (error: any) {
+        console.error('[GET /api/customer/group] Error validating Shopify session token:', {
+          error: error.message,
+          stack: error.stack,
+        });
       }
     }
 
