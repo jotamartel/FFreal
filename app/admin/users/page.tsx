@@ -491,6 +491,7 @@ export default function UsersManagementPage() {
                                 min={1}
                                 disabled={saving[user.id]}
                                 helpText={t('users.maxMembersPerGroupHelp')}
+                                autoComplete="off"
                               />
                               <TextField
                                 label={t('users.discountTierIdentifier')}
@@ -500,6 +501,7 @@ export default function UsersManagementPage() {
                                 }}
                                 disabled={saving[user.id]}
                                 helpText={t('users.discountTierIdentifierHelp')}
+                                autoComplete="off"
                               />
                             </InlineGrid>
                           </BlockStack>
