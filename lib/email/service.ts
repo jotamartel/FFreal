@@ -62,7 +62,7 @@ export interface EmailOptions {
 /**
  * Send email using SMTP (Gmail, Outlook, etc.)
  */
-async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
+async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string; code?: string }> {
   const transporter = getSMTPTransporter();
   
   if (!transporter) {
@@ -209,7 +209,7 @@ async function sendEmailViaResend(options: EmailOptions): Promise<{ success: boo
 /**
  * Main email sending function - tries SMTP first, then Resend
  */
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string }> {
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string; message?: string; code?: string }> {
   try {
     // Priority: SMTP if configured, then Resend
     const transporter = getSMTPTransporter();
