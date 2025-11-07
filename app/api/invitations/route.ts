@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 // API routes for Friends & Family Invitations
 
 import { NextRequest, NextResponse } from 'next/server';

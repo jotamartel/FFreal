@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 // API route to send invitation email
 
 import { NextRequest, NextResponse } from 'next/server';
