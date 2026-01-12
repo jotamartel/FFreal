@@ -60,7 +60,6 @@ export default function TiendaPage() {
 
   const loadGroups = async () => {
     try {
-      if (!storeChecked) return;
       const response = await fetch('/api/customer/group');
       
       if (response.status === 401) {
