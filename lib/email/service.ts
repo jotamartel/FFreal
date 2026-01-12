@@ -2,6 +2,23 @@
 
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import { pool } from '@/lib/database/client';
+import {
+  renderInvitationTemplate,
+  renderWelcomeTemplate,
+  renderVerificationTemplate,
+  renderOrderConfirmationTemplate,
+  renderOrderShippedTemplate,
+  renderOrderDeliveredTemplate,
+  renderDeliveryIssueTemplate,
+  renderPartialRefundTemplate,
+  InvitationTemplateData,
+  WelcomeTemplateData,
+  VerificationTemplateData,
+  OrderTemplateData,
+  DeliveryIssueTemplateData,
+  SupportedLanguage,
+} from './templates';
 
 // Initialize Resend only if API key is available (to prevent build errors)
 const resend = process.env.RESEND_API_KEY 
@@ -10,6 +27,7 @@ const resend = process.env.RESEND_API_KEY
 
 // Lazy initialization of SMTP transporter (to avoid Edge Runtime issues)
 let smtpTransporter: nodemailer.Transporter | null = null;
+const emailSettingsCache = new Map<string, { from: string | null; support: string | null }>();
 
 function getSMTPTransporter(): nodemailer.Transporter | null {
   // Check if already initialized
@@ -18,7 +36,17 @@ function getSMTPTransporter(): nodemailer.Transporter | null {
   }
 
   // Check if SMTP is configured
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPassword = process.env.SMTP_PASSWORD;
+
+  if (!smtpHost || !smtpUser || !smtpPassword) {
+    console.log('[EMAIL] SMTP not configured - missing variables:', {
+      hasSMTP_HOST: !!smtpHost,
+      hasSMTP_USER: !!smtpUser,
+      hasSMTP_PASSWORD: !!smtpPassword,
+      hint: 'Configure SMTP_HOST, SMTP_USER, and SMTP_PASSWORD in Vercel environment variables',
+    });
     return null;
   }
 
@@ -27,7 +55,7 @@ function getSMTPTransporter(): nodemailer.Transporter | null {
     smtpTransporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      secure: process.env.SMTP_SECURE?.toLowerCase() === 'true', // true for 465, false for other ports (case-insensitive)
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
@@ -41,7 +69,8 @@ function getSMTPTransporter(): nodemailer.Transporter | null {
     console.log('[EMAIL] SMTP transporter initialized:', {
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT || '587',
-      secure: process.env.SMTP_SECURE === 'true',
+      secure: process.env.SMTP_SECURE?.toLowerCase() === 'true',
+      secureRaw: process.env.SMTP_SECURE,
       user: process.env.SMTP_USER?.substring(0, 3) + '***',
     });
 
@@ -49,6 +78,62 @@ function getSMTPTransporter(): nodemailer.Transporter | null {
   } catch (error: any) {
     console.error('[EMAIL] Error initializing SMTP transporter:', error);
     return null;
+  }
+}
+
+async function getEmailSettings(merchantId: string): Promise<{ from: string | null; support: string | null }> {
+  if (emailSettingsCache.has(merchantId)) {
+    return emailSettingsCache.get(merchantId)!;
+  }
+
+  try {
+    // Check if columns exist first
+    const columnCheck = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'ff_discount_config' 
+      AND column_name IN ('email_from', 'email_support')
+    `);
+    
+    const hasEmailFrom = columnCheck.rows.some((r: any) => r.column_name === 'email_from');
+    const hasEmailSupport = columnCheck.rows.some((r: any) => r.column_name === 'email_support');
+
+    if (!hasEmailFrom || !hasEmailSupport) {
+      console.error('[EMAIL] Missing columns in ff_discount_config:', {
+        hasEmailFrom,
+        hasEmailSupport,
+        hint: 'Execute migration_add_email_columns.sql in Supabase SQL Editor'
+      });
+      // Return defaults if columns don't exist
+      const settings = { from: null, support: null };
+      emailSettingsCache.set(merchantId, settings);
+      return settings;
+    }
+
+    const result = await pool.query(
+      `SELECT email_from, email_support FROM ff_discount_config WHERE merchant_id = $1`,
+      [merchantId]
+    );
+
+    const row = result.rows[0];
+    const settings = {
+      from: row?.email_from || null,
+      support: row?.email_support || null,
+    };
+
+    emailSettingsCache.set(merchantId, settings);
+    return settings;
+  } catch (error: any) {
+    // Handle case where columns don't exist
+    if (error.message?.includes('email_from') || error.message?.includes('email_support')) {
+      console.error('[EMAIL] Database schema error - missing email columns:', error.message);
+      console.error('[EMAIL] Solution: Execute lib/database/migration_add_email_columns.sql in Supabase SQL Editor');
+      const settings = { from: null, support: null };
+      emailSettingsCache.set(merchantId, settings);
+      return settings;
+    }
+    throw error;
   }
 }
 
@@ -82,7 +167,8 @@ async function sendEmailViaSMTP(options: EmailOptions): Promise<{ success: boole
       subject: options.subject,
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT || '587',
-      secure: process.env.SMTP_SECURE === 'true',
+      secure: process.env.SMTP_SECURE?.toLowerCase() === 'true',
+      secureRaw: process.env.SMTP_SECURE,
     });
 
     // Verify connection first
@@ -183,10 +269,17 @@ async function sendEmailViaResend(options: EmailOptions): Promise<{ success: boo
     const error = result.error as any;
     if (error.statusCode === 403 && error.name === 'validation_error') {
       // This is the "test domain" error - provide helpful message
+      const helpMessage = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, tienes 3 opciones:\n' +
+        '1. Verificar un dominio en Resend (recomendado para producción)\n' +
+        '2. Configurar SMTP con Gmail/Outlook (solución rápida)\n' +
+        '3. Agregar emails de prueba en Resend Dashboard (solo para desarrollo)\n' +
+        'Ver FIX_RESEND_TEST_MODE.md para instrucciones detalladas.\n' +
+        'La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente.';
+      
       return { 
         success: false, 
         error: 'DOMAIN_NOT_VERIFIED',
-        message: 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada, pero el email no pudo ser enviado. Puedes compartir el código de invitación manualmente.'
+        message: helpMessage
       };
     }
     
@@ -214,15 +307,21 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     // Priority: SMTP if configured, then Resend
     const transporter = getSMTPTransporter();
     if (transporter) {
-      console.log('[EMAIL] Using SMTP transport');
+      console.log('[EMAIL] ✅ SMTP configured - Using SMTP transport');
       const result = await sendEmailViaSMTP(options);
       if (result.success) {
         return result;
       }
       // If SMTP fails, fallback to Resend if available
-      console.warn('[EMAIL] SMTP failed, trying Resend as fallback:', result.error);
+      console.warn('[EMAIL] ⚠️ SMTP failed, trying Resend as fallback:', result.error);
     } else {
-      console.log('[EMAIL] SMTP not configured, checking Resend...');
+      console.log('[EMAIL] ⚠️ SMTP not configured - checking Resend...');
+      console.log('[EMAIL] Debug - Environment variables:', {
+        SMTP_HOST: process.env.SMTP_HOST ? 'SET' : 'NOT SET',
+        SMTP_USER: process.env.SMTP_USER ? 'SET' : 'NOT SET',
+        SMTP_PASSWORD: process.env.SMTP_PASSWORD ? 'SET' : 'NOT SET',
+        RESEND_API_KEY: process.env.RESEND_API_KEY ? 'SET' : 'NOT SET',
+      });
     }
 
     // Try Resend if SMTP is not configured or failed
@@ -245,125 +344,124 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
   }
 }
 
-/**
- * Send invitation email
- */
-export async function sendInvitationEmail(
-  email: string,
-  groupName: string,
-  inviteLink: string,
-  inviteCode?: string
-): Promise<boolean> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Friends & Family Invitation</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0;">Friends & Family Invitation</h1>
-      </div>
-      <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #333; margin-top: 0;">You've been invited!</h2>
-        <p>You've been invited to join <strong>${groupName}</strong>!</p>
-        <p>Join this Friends & Family group to start saving together with exclusive discounts.</p>
-        ${inviteCode ? `
-        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; color: #666; font-size: 14px;">Your invitation code:</p>
-          <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #667eea; letter-spacing: 2px;">${inviteCode}</p>
-        </div>
-        ` : ''}
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${inviteLink}" 
-             style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-            Accept Invitation
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          This invitation link will expire in 7 days.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If you did not expect this invitation, you can safely ignore this email.
-        </p>
-      </div>
-    </body>
-    </html>
-  `;
+interface BaseEmailParams {
+  to: string;
+  merchantId?: string;
+  language?: SupportedLanguage;
+}
 
+async function sendTemplatedEmail(
+  params: BaseEmailParams,
+  template: { subject: string; html: string }
+): Promise<boolean> {
+  const { to, merchantId = 'default' } = params;
+  const settings = await getEmailSettings(merchantId);
   const result = await sendEmail({
-    to: email,
-    subject: `Invitation to join ${groupName} - Friends & Family`,
-    html,
+    to,
+    subject: template.subject,
+    html: template.html,
+    from: settings.from || undefined,
   });
 
   if (!result.success) {
-    console.error('[EMAIL] Failed to send invitation email:', result.error);
-    
-    // If it's a domain verification error, throw a specific error type
+    console.error('[EMAIL] Failed to send email:', result.error);
     if (result.error === 'DOMAIN_NOT_VERIFIED') {
       const domainError = new Error(result.message || 'Domain not verified');
       (domainError as any).code = 'DOMAIN_NOT_VERIFIED';
       throw domainError;
     }
-    
-    // For other errors, throw with the error message
     throw new Error(result.error || 'Failed to send email');
   }
 
-  return result.success;
+  return true;
 }
 
-/**
- * Send email verification
- */
-export async function sendVerificationEmail(
-  email: string,
-  verificationLink: string
+export async function sendInvitationEmail(
+  params: BaseEmailParams & InvitationTemplateData
 ): Promise<boolean> {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Verify Your Email</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0;">Verify Your Email</h1>
-      </div>
-      <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #333; margin-top: 0;">Almost there!</h2>
-        <p>Please verify your email address to complete your registration and activate your Friends & Family group membership.</p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationLink}" 
-             style="background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-            Verify Email Address
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          This verification link will expire in 24 hours.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If you did not create an account, you can safely ignore this email.
-        </p>
-      </div>
-    </body>
-    </html>
-  `;
+  const template = renderInvitationTemplate(
+    {
+      groupName: params.groupName,
+      inviteLink: params.inviteLink,
+      inviteCode: params.inviteCode,
+      inviterName: params.inviterName,
+    },
+    params.language
+  );
 
-  const result = await sendEmail({
-    to: email,
-    subject: 'Verify your email address - Friends & Family',
-    html,
-  });
+  return sendTemplatedEmail(params, template);
+}
 
-  if (!result.success) {
-    console.error('[EMAIL] Failed to send verification email:', result.error);
-  }
+export async function sendGroupWelcomeEmail(
+  params: BaseEmailParams & WelcomeTemplateData
+): Promise<boolean> {
+  const template = renderWelcomeTemplate(
+    {
+      groupName: params.groupName,
+      inviteCode: params.inviteCode,
+    },
+    params.language
+  );
 
-  return result.success;
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendVerificationEmail(
+  params: BaseEmailParams & VerificationTemplateData
+): Promise<boolean> {
+  const template = renderVerificationTemplate(
+    { verificationLink: params.verificationLink },
+    params.language
+  );
+
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendOrderConfirmationEmail(
+  params: BaseEmailParams & OrderTemplateData
+): Promise<boolean> {
+  const template = renderOrderConfirmationTemplate(params, params.language);
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendOrderShippedEmail(
+  params: BaseEmailParams & OrderTemplateData
+): Promise<boolean> {
+  const template = renderOrderShippedTemplate(params, params.language);
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendOrderDeliveredEmail(
+  params: BaseEmailParams & OrderTemplateData
+): Promise<boolean> {
+  const template = renderOrderDeliveredTemplate(params, params.language);
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendDeliveryIssueEmail(
+  params: BaseEmailParams & DeliveryIssueTemplateData
+): Promise<boolean> {
+  const settings = await getEmailSettings(params.merchantId || 'default');
+  const template = renderDeliveryIssueTemplate(
+    {
+      ...params,
+      supportEmail: params.supportEmail || settings.support || undefined,
+    },
+    params.language
+  );
+  return sendTemplatedEmail(params, template);
+}
+
+export async function sendPartialRefundEmail(
+  params: BaseEmailParams & DeliveryIssueTemplateData
+): Promise<boolean> {
+  const settings = await getEmailSettings(params.merchantId || 'default');
+  const template = renderPartialRefundTemplate(
+    {
+      ...params,
+      supportEmail: params.supportEmail || settings.support || undefined,
+    },
+    params.language
+  );
+  return sendTemplatedEmail(params, template);
 }

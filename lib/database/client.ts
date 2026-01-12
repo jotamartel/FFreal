@@ -6,7 +6,15 @@ import { Pool } from 'pg';
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 if (!connectionString) {
-  console.warn('⚠️ DATABASE_URL or POSTGRES_URL not configured');
+  const errorMsg = '⚠️ DATABASE_URL or POSTGRES_URL not configured. Please add DATABASE_URL to your .env.local file. See FIX_SUPABASE_CONNECTION.md for instructions.';
+  console.error(errorMsg);
+  // En desarrollo, mostrar error más visible
+  if (process.env.NODE_ENV === 'development') {
+    console.error('\n📋 Quick Fix:');
+    console.error('1. Get connection string from Supabase Dashboard → Settings → Database');
+    console.error('2. Add to .env.local: DATABASE_URL=postgresql://...');
+    console.error('3. Restart dev server\n');
+  }
 }
 
 // Detectar si es Supabase (más robusto)

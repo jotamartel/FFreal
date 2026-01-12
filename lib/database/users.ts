@@ -224,6 +224,22 @@ export async function updateUser(
       return null;
     }
 
+    if (params.maxMembersPerGroup !== undefined) {
+      try {
+        await pool.query(
+          `UPDATE ff_groups
+           SET max_members = COALESCE($1,
+             (SELECT max_members_default FROM ff_discount_config WHERE merchant_id = ff_groups.merchant_id LIMIT 1),
+             20),
+               updated_at = NOW()
+           WHERE owner_user_id = $2`,
+          [params.maxMembersPerGroup, id]
+        );
+      } catch (groupUpdateError) {
+        console.error('[updateUser] Error syncing group max members:', groupUpdateError);
+      }
+    }
+
     return mapRowToUser(result.rows[0]);
   } catch (error) {
     console.error('[updateUser] Error updating user:', error);

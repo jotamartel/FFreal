@@ -161,11 +161,6 @@ function JoinGroupContent() {
                   <Text as="p" variant="bodyMd">
                     {group.current_members} / {group.max_members} miembros
                   </Text>
-                  {group.status === 'active' && (
-                    <Text as="p" variant="bodyMd" tone="success">
-                      Descuento actual: {group.discount_tier}%
-                    </Text>
-                  )}
                 </BlockStack>
 
                 {isFull && (

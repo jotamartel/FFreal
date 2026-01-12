@@ -57,6 +57,10 @@ export interface FFDiscountConfig {
   is_store_open: boolean;
   next_event_date?: string | null;
   event_message?: string | null;
+  terms_version?: string | null;
+  terms_text?: string | null;
+  email_from?: string | null;
+  email_support?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -118,5 +122,9 @@ export interface UpdateDiscountConfigParams {
   isStoreOpen?: boolean;
   nextEventDate?: string | null;
   eventMessage?: string | null;
+  termsVersion?: string | null;
+  termsText?: string | null;
+  emailFrom?: string | null;
+  emailSupport?: string | null;
 }
 

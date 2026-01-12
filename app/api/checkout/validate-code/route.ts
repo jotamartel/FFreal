@@ -1,7 +1,7 @@
 // API route to validate group code at checkout
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getGroupByInviteCode, calculateDiscount } from '@/lib/database/ff-groups';
+import { getGroupByInviteCode } from '@/lib/database/ff-groups';
 
 /**
  * POST /api/checkout/validate-code - Validate a group invite code
@@ -34,10 +34,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate discount for this group
-    // Try by tierIdentifier first (from group.discount_tier), then fallback to memberCount
-    const discount = await calculateDiscount(merchantId, group.current_members, group.discount_tier);
-
     return NextResponse.json({
       valid: true,
       group: {
@@ -46,7 +42,7 @@ export async function POST(request: NextRequest) {
         currentMembers: group.current_members,
         maxMembers: group.max_members,
       },
-      discount,
+      discount: 0,
     }, { status: 200 });
   } catch (error) {
     console.error('Error validating code:', error);

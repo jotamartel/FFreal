@@ -45,7 +45,6 @@ export async function GET(
       groupId: group.id,
       groupName: group.name,
       discountCode: group.discount_code,
-      discountTier: group.discount_tier,
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting discount code:', error);

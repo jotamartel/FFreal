@@ -23,7 +23,6 @@ interface Group {
   max_members: number;
   status: string;
   invite_code: string;
-  discount_tier: number;
 }
 
 export default function CustomerPortal() {
@@ -92,8 +91,7 @@ export default function CustomerPortal() {
         {activeGroup && (
           <Layout.Section>
             <Banner tone="info">
-              You're currently in the <strong>{activeGroup.name}</strong> group. 
-              You're saving with a {activeGroup.discount_tier}% discount!
+              You're currently in the <strong>{activeGroup.name}</strong> group.
             </Banner>
           </Layout.Section>
         )}
@@ -140,11 +138,6 @@ export default function CustomerPortal() {
                         <Text as="p" variant="bodyMd">
                           Members: {group.current_members} / {group.max_members}
                         </Text>
-                        {group.status === 'active' && (
-                          <Text as="p" variant="bodyMd" tone="success">
-                            Current Discount: {group.discount_tier}%
-                          </Text>
-                        )}
                         <Text as="p" variant="bodyMd" tone="subdued">
                           Invite Code: <code style={{ fontFamily: 'monospace' }}>{group.invite_code}</code>
                         </Text>

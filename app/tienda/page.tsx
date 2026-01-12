@@ -25,7 +25,6 @@ interface Group {
   max_members: number;
   status: string;
   invite_code: string;
-  discount_tier: number;
 }
 
 export default function TiendaPage() {
@@ -36,7 +35,9 @@ export default function TiendaPage() {
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
+    // Removed store status check - Friends & Family app should always be available
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAuth = async () => {
@@ -59,6 +60,7 @@ export default function TiendaPage() {
 
   const loadGroups = async () => {
     try {
+      if (!storeChecked) return;
       const response = await fetch('/api/customer/group');
       
       if (response.status === 401) {
@@ -166,8 +168,7 @@ export default function TiendaPage() {
         {activeGroup && (
           <Layout.Section>
             <Banner tone="info">
-              Estás en el grupo <strong>{activeGroup.name}</strong>. 
-              Estás ahorrando con un {activeGroup.discount_tier}% de descuento!
+              Estás en el grupo <strong>{activeGroup.name}</strong>.
             </Banner>
           </Layout.Section>
         )}
@@ -214,11 +215,6 @@ export default function TiendaPage() {
                         <Text as="p" variant="bodyMd">
                           Miembros: {group.current_members} / {group.max_members}
                         </Text>
-                        {group.status === 'active' && (
-                          <Text as="p" variant="bodyMd" tone="success">
-                            Descuento Actual: {group.discount_tier}%
-                          </Text>
-                        )}
                         <Text as="p" variant="bodyMd" tone="subdued">
                           Código de Invitación: <code style={{ fontFamily: 'monospace' }}>{group.invite_code}</code>
                         </Text>

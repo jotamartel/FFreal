@@ -66,7 +66,14 @@ export async function POST(request: NextRequest) {
           hasResendKey: !!process.env.RESEND_API_KEY,
         });
         
-        emailSent = await sendInvitationEmail(email, group.name, inviteLink, group.invite_code);
+        emailSent = await sendInvitationEmail({
+          to: email,
+          groupName: group.name,
+          inviteLink,
+          inviteCode: group.invite_code,
+          merchantId: group.merchant_id,
+          language: 'es',
+        });
 
         if (!emailSent) {
           emailError = 'Email service not configured or failed to send';

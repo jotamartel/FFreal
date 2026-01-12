@@ -18,8 +18,10 @@ export async function DELETE(
 ) {
   try {
     const invitationId = params.id;
+    console.log('[DELETE /api/invitations/[id]] Revoking invitation:', invitationId);
 
     if (!invitationId) {
+      console.error('[DELETE /api/invitations/[id]] Missing invitation ID');
       return NextResponse.json(
         { error: 'Invitation ID is required' },
         { status: 400 }
@@ -91,15 +93,19 @@ export async function DELETE(
     // In the future, you might want to check group.owner_user_id === userId
 
     // Revoke the invitation
+    console.log('[DELETE /api/invitations/[id]] Calling revokeInvitation for:', invitation.id);
     const success = await revokeInvitation(invitation.id);
+    console.log('[DELETE /api/invitations/[id]] Revoke result:', success);
 
     if (!success) {
+      console.warn('[DELETE /api/invitations/[id]] Failed to revoke invitation:', invitation.id);
       return NextResponse.json(
         { error: 'Failed to revoke invitation. It may have already been accepted or revoked.' },
         { status: 400 }
       );
     }
 
+    console.log('[DELETE /api/invitations/[id]] ✅ Invitation revoked successfully');
     return NextResponse.json({ 
       success: true,
       message: 'Invitation revoked successfully'

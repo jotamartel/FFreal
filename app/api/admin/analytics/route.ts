@@ -60,6 +60,30 @@ export async function GET(request: NextRequest) {
       [merchantId]
     );
 
+    // Growth over time (last 12 months)
+    const growthResult = await pool.query(
+      `SELECT date_trunc('month', created_at) AS month, COUNT(*) AS count
+       FROM ff_groups
+       WHERE merchant_id = $1
+       GROUP BY month
+       ORDER BY month ASC
+       LIMIT 12`,
+      [merchantId]
+    );
+
+    // Size distribution buckets
+    const distributionResult = await pool.query(
+      `SELECT
+          SUM(CASE WHEN current_members <= 2 THEN 1 ELSE 0 END) AS up_to_2,
+          SUM(CASE WHEN current_members BETWEEN 3 AND 4 THEN 1 ELSE 0 END) AS from_3_to_4,
+          SUM(CASE WHEN current_members BETWEEN 5 AND 6 THEN 1 ELSE 0 END) AS from_5_to_6,
+          SUM(CASE WHEN current_members BETWEEN 7 AND 10 THEN 1 ELSE 0 END) AS from_7_to_10,
+          SUM(CASE WHEN current_members > 10 THEN 1 ELSE 0 END) AS above_10
+       FROM ff_groups
+       WHERE merchant_id = $1`,
+      [merchantId]
+    );
+
     const analytics = {
       totalGroups: parseInt(totalGroupsResult.rows[0]?.total || '0'),
       averageGroupSize: parseFloat(groupsResult.rows[0]?.avg_members || '0'),
@@ -69,6 +93,17 @@ export async function GET(request: NextRequest) {
         return acc;
       }, {}),
       topGroups: topGroupsResult.rows,
+      growth: growthResult.rows.map((row) => ({
+        month: row.month,
+        count: parseInt(row.count),
+      })),
+      sizeDistribution: {
+        upTo2: parseInt(distributionResult.rows[0]?.up_to_2 || '0'),
+        from3To4: parseInt(distributionResult.rows[0]?.from_3_to_4 || '0'),
+        from5To6: parseInt(distributionResult.rows[0]?.from_5_to_6 || '0'),
+        from7To10: parseInt(distributionResult.rows[0]?.from_7_to_10 || '0'),
+        above10: parseInt(distributionResult.rows[0]?.above_10 || '0'),
+      },
     };
 
     console.log('[ADMIN ANALYTICS] Analytics data:', {

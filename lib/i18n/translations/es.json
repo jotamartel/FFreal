@@ -90,7 +90,72 @@
     "title": "Grupos Friends & Family",
     "viewAnalytics": "Ver Analíticas",
     "export": "Exportar",
-    "import": "Importar"
+    "import": "Importar",
+    "exportJson": "Exportar JSON",
+    "exportCsv": "Exportar CSV",
+    "exportSuccess": "Exportación completada en formato {{format}}",
+    "exportError": "No se pudo exportar los grupos. Intenta nuevamente.",
+    "loadError": "No se pudieron cargar los grupos. Intenta nuevamente.",
+    "importSuccess": "Importación realizada correctamente.",
+    "importError": "No se pudo importar el archivo.",
+    "importNoFile": "Selecciona un archivo para importar.",
+    "searchLabel": "Buscar grupos",
+    "searchPlaceholder": "Buscar por nombre, owner o código...",
+    "statusFilter": {
+      "label": "Estado",
+      "all": "Todos"
+    },
+    "status": {
+      "active": "Activo",
+      "suspended": "Suspendido",
+      "terminated": "Terminado"
+    },
+    "memberFilters": {
+      "min": "Mínimo de miembros",
+      "max": "Máximo de miembros"
+    },
+    "empty": {
+      "heading": "No se encontraron grupos",
+      "description": "No hay grupos que coincidan con los filtros seleccionados.",
+      "action": "Actualizar"
+    },
+    "table": {
+      "name": "Nombre",
+      "owner": "Propietario",
+      "members": "Miembros",
+      "status": "Estado",
+      "inviteCode": "Código de invitación",
+      "created": "Creado",
+      "actions": "Acciones"
+    },
+    "actions": {
+      "view": "Ver",
+      "activate": "Reactivar",
+      "suspend": "Suspender",
+      "terminate": "Terminar",
+      "sync": "Sincronizar"
+    },
+    "statusUpdated": "El estado del grupo se actualizó correctamente.",
+    "statusUpdateError": "No se pudo actualizar el estado del grupo.",
+    "syncSuccess": "Miembros sincronizados correctamente.",
+    "syncError": "No se pudo sincronizar el conteo de miembros.",
+    "importModal": {
+      "title": "Importar grupos y miembros",
+      "description": "Importa grupos y miembros desde un archivo JSON o CSV. El archivo debe respetar el formato de exportación.",
+      "primaryAction": "Importar",
+      "modeLabel": "Modo de importación",
+      "modeSkip": "Omitir existentes (recomendado)",
+      "modeUpdate": "Actualizar existentes",
+      "modeReplace": "Reemplazar todo",
+      "modeHelp": "Omitir: no importa si el grupo existe. Actualizar: actualiza grupos existentes. Reemplazar: elimina y recrea los grupos.",
+      "resultSuccess": "Importación exitosa",
+      "resultError": "Importación fallida",
+      "summaryLabel": "Resumen",
+      "createdLabel": "Creados",
+      "updatedLabel": "Actualizados",
+      "skippedLabel": "Omitidos",
+      "errorsLabel": "Errores reportados"
+    }
   },
   "config": {
     "title": "Configuración de Descuentos",
@@ -114,7 +179,20 @@
     "members": "Miembros",
     "created": "Creado",
     "noData": "No hay datos de analíticas",
-    "unableToLoad": "No se pudieron cargar los datos de analíticas."
+    "unableToLoad": "No se pudieron cargar los datos de analíticas.",
+    "growthTitle": "Crecimiento de grupos",
+    "growthSubtitle": "Grupos creados por mes",
+    "noGrowthData": "Aún no hay datos de crecimiento.",
+    "distribution": {
+      "title": "Distribución por tamaño de grupo",
+      "noData": "No hay datos de distribución disponibles.",
+      "upTo2": "Hasta 2 miembros",
+      "from3To4": "De 3 a 4 miembros",
+      "from5To6": "De 5 a 6 miembros",
+      "from7To10": "De 7 a 10 miembros",
+      "above10": "Más de 10 miembros"
+    },
+    "unknown": "Desconocido"
   }
 }
 

@@ -13,7 +13,7 @@ import { verifyToken } from './lib/auth/session';
 const protectedRoutes = ['/customer'];
 
 // Public routes (accessible without authentication)
-const publicRoutes = ['/tienda', '/login'];
+const publicRoutes = ['/tienda', '/login', '/closed'];
 
 // Routes that should redirect to /customer if already authenticated
 const authRoutes = ['/login'];

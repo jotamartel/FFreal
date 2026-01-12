@@ -90,7 +90,72 @@
     "title": "Friends & Family Groups",
     "viewAnalytics": "View Analytics",
     "export": "Export",
-    "import": "Import"
+    "import": "Import",
+    "exportJson": "Export JSON",
+    "exportCsv": "Export CSV",
+    "exportSuccess": "Export completed in {{format}} format.",
+    "exportError": "Unable to export groups. Please try again.",
+    "loadError": "Unable to load groups. Please try again.",
+    "importSuccess": "Groups imported successfully.",
+    "importError": "Unable to import the file.",
+    "importNoFile": "Select a file to import.",
+    "searchLabel": "Search groups",
+    "searchPlaceholder": "Search by name, owner or code...",
+    "statusFilter": {
+      "label": "Status",
+      "all": "All"
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "terminated": "Terminated"
+    },
+    "memberFilters": {
+      "min": "Min members",
+      "max": "Max members"
+    },
+    "empty": {
+      "heading": "No groups found",
+      "description": "No groups match the selected filters.",
+      "action": "Refresh"
+    },
+    "table": {
+      "name": "Name",
+      "owner": "Owner",
+      "members": "Members",
+      "status": "Status",
+      "inviteCode": "Invite code",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view": "View",
+      "activate": "Activate",
+      "suspend": "Suspend",
+      "terminate": "Terminate",
+      "sync": "Sync"
+    },
+    "statusUpdated": "Group status updated successfully.",
+    "statusUpdateError": "Unable to update group status.",
+    "syncSuccess": "Members synced successfully.",
+    "syncError": "Unable to sync member count.",
+    "importModal": {
+      "title": "Import groups and members",
+      "description": "Import groups and members from a JSON or CSV file. The file should match the export format.",
+      "primaryAction": "Import",
+      "modeLabel": "Import mode",
+      "modeSkip": "Skip existing (recommended)",
+      "modeUpdate": "Update existing",
+      "modeReplace": "Replace all",
+      "modeHelp": "Skip: do not import if the group already exists. Update: update existing groups. Replace: delete and recreate groups.",
+      "resultSuccess": "Import successful",
+      "resultError": "Import failed",
+      "summaryLabel": "Summary",
+      "createdLabel": "Created",
+      "updatedLabel": "Updated",
+      "skippedLabel": "Skipped",
+      "errorsLabel": "Reported errors"
+    }
   },
   "config": {
     "title": "Discount Configuration",
@@ -114,7 +179,20 @@
     "members": "Members",
     "created": "Created",
     "noData": "No analytics data",
-    "unableToLoad": "Unable to load analytics data."
+    "unableToLoad": "Unable to load analytics data.",
+    "growthTitle": "Group Growth",
+    "growthSubtitle": "Groups created per month",
+    "noGrowthData": "No growth data available yet.",
+    "distribution": {
+      "title": "Group Size Distribution",
+      "noData": "No size distribution available.",
+      "upTo2": "Up to 2 members",
+      "from3To4": "3 to 4 members",
+      "from5To6": "5 to 6 members",
+      "from7To10": "7 to 10 members",
+      "above10": "More than 10 members"
+    },
+    "unknown": "Unknown"
   }
 }
 

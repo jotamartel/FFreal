@@ -33,6 +33,11 @@ interface Group {
   created_at: string;
 }
 
+interface FeedbackState {
+  tone: 'success' | 'critical' | 'warning';
+  message: string;
+}
+
 export default function GroupsPage() {
   const router = useRouter();
   const { t } = useI18n();
@@ -40,38 +45,47 @@ export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [minMembers, setMinMembers] = useState('');
+  const [maxMembers, setMaxMembers] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<string>('skip');
   const [importResult, setImportResult] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [actionLoading, setActionLoading] = useState<{ id: string | null; action: string | null }>({
+    id: null,
+    action: null,
+  });
 
   useEffect(() => {
     loadGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const loadGroups = async () => {
     try {
-      // Use 'default' to match groups created from frontend
-      // In a multi-tenant app, this would come from Shopify session
+      setLoading(true);
       const merchantId = 'default';
       const status = statusFilter === 'all' ? undefined : statusFilter;
       const url = `/api/admin/groups?merchantId=${merchantId}${status ? `&status=${status}` : ''}`;
-      
+
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (!response.ok) {
         console.error('Error loading groups:', data.error);
         setGroups([]);
+        setFeedback({ tone: 'critical', message: t('groups.loadError') });
         return;
       }
-      
+
       setGroups(data.groups || []);
     } catch (error) {
       console.error('Error loading groups:', error);
       setGroups([]);
+      setFeedback({ tone: 'critical', message: t('groups.loadError') });
     } finally {
       setLoading(false);
     }
@@ -80,11 +94,11 @@ export default function GroupsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge tone="success">Active</Badge>;
+        return <Badge tone="success">{t('groups.status.active')}</Badge>;
       case 'suspended':
-        return <Badge tone="attention">Suspended</Badge>;
+        return <Badge tone="attention">{t('groups.status.suspended')}</Badge>;
       case 'terminated':
-        return <Badge tone="critical">Terminated</Badge>;
+        return <Badge tone="critical">{t('groups.status.terminated')}</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -95,7 +109,7 @@ export default function GroupsPage() {
     try {
       const merchantId = 'default';
       const url = `/api/admin/groups/export?format=${format}&merchantId=${merchantId}`;
-      
+
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to export');
@@ -110,9 +124,13 @@ export default function GroupsPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+      setFeedback({
+        tone: 'success',
+        message: `${t('groups.exportSuccess')} (${format.toUpperCase()})`,
+      });
     } catch (error) {
       console.error('Error exporting:', error);
-      alert('Error exporting groups. Please try again.');
+      setFeedback({ tone: 'critical', message: t('groups.exportError') });
     } finally {
       setExporting(false);
     }
@@ -120,7 +138,7 @@ export default function GroupsPage() {
 
   const handleImportFile = async () => {
     if (!importFile) {
-      alert('Please select a file');
+      setFeedback({ tone: 'warning', message: t('groups.importNoFile') });
       return;
     }
 
@@ -134,14 +152,13 @@ export default function GroupsPage() {
       if (importFile.name.endsWith('.json')) {
         data = JSON.parse(text);
       } else if (importFile.name.endsWith('.csv')) {
-        // Simple CSV parsing (basic implementation)
         const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const headers = lines[0].split(',').map((h) => h.trim().replace(/"/g, ''));
         const groupsMap = new Map();
 
         for (let i = 1; i < lines.length; i++) {
           if (!lines[i].trim()) continue;
-          const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+          const values = lines[i].split(',').map((v) => v.trim().replace(/"/g, ''));
           const groupIdIndex = headers.indexOf('Group ID');
           const groupNameIndex = headers.indexOf('Group Name');
           const ownerEmailIndex = headers.indexOf('Owner Email');
@@ -190,11 +207,13 @@ export default function GroupsPage() {
       setImportResult(result);
 
       if (result.success) {
-        // Reload groups after successful import
+        setFeedback({ tone: 'success', message: t('groups.importSuccess') });
         setTimeout(() => {
           loadGroups();
           setShowImportModal(false);
         }, 2000);
+      } else {
+        setFeedback({ tone: 'critical', message: result.error || t('groups.importError') });
       }
     } catch (error: any) {
       console.error('Error importing:', error);
@@ -202,35 +221,164 @@ export default function GroupsPage() {
         success: false,
         error: error.message || 'Error importing file',
       });
+      setFeedback({ tone: 'critical', message: error.message || t('groups.importError') });
     } finally {
       setImporting(false);
     }
   };
 
-  const filteredGroups = groups.filter((group) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      group.name.toLowerCase().includes(query) ||
-      group.owner_email.toLowerCase().includes(query) ||
-      group.invite_code.toLowerCase().includes(query)
-    );
-  });
+  const handleStatusAction = async (groupId: string, action: 'activate' | 'suspend' | 'terminate') => {
+    try {
+      setActionLoading({ id: groupId, action });
+      let response: Response;
 
-  const rows = filteredGroups.map((group) => [
-    group.name,
-    group.owner_email,
-    `${group.current_members}/${group.max_members}`,
-    getStatusBadge(group.status),
-    group.invite_code,
-    new Date(group.created_at).toLocaleDateString(),
-    <Button
-      key={group.id}
-      onClick={() => router.push(`/admin/groups/${group.id}`)}
-    >
-      View
-    </Button>,
-  ]);
+      if (action === 'activate') {
+        response = await fetch(`/api/groups/${groupId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'active' }),
+        });
+      } else {
+        response = await fetch(`/api/admin/groups/${groupId}/suspend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update group status');
+      }
+
+      setFeedback({ tone: 'success', message: t('groups.statusUpdated') });
+      await loadGroups();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setFeedback({ tone: 'critical', message: t('groups.statusUpdateError') });
+    } finally {
+      setActionLoading({ id: null, action: null });
+    }
+  };
+
+  const handleSyncMembers = async (groupId: string) => {
+    try {
+      setActionLoading({ id: groupId, action: 'sync' });
+      const response = await fetch(`/api/admin/groups/${groupId}/sync-members`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to sync members');
+      }
+      setFeedback({ tone: 'success', message: t('groups.syncSuccess') });
+      await loadGroups();
+    } catch (error) {
+      console.error('Error syncing members:', error);
+      setFeedback({ tone: 'critical', message: t('groups.syncError') });
+    } finally {
+      setActionLoading({ id: null, action: null });
+    }
+  };
+
+  const filteredGroups = groups
+    .filter((group) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        group.name.toLowerCase().includes(query) ||
+        group.owner_email.toLowerCase().includes(query) ||
+        group.invite_code.toLowerCase().includes(query)
+      );
+    })
+    .filter((group) => {
+      const min = minMembers ? parseInt(minMembers, 10) : null;
+      const max = maxMembers ? parseInt(maxMembers, 10) : null;
+      if (min !== null && group.current_members < min) {
+        return false;
+      }
+      if (max !== null && group.current_members > max) {
+        return false;
+      }
+      return true;
+    });
+
+  const rows = filteredGroups.map((group) => {
+    const actions = [];
+
+    if (group.status !== 'active') {
+      actions.push(
+        <Button
+          key={`${group.id}-activate`}
+          variant="secondary"
+          size="slim"
+          onClick={() => handleStatusAction(group.id, 'activate')}
+          loading={actionLoading.id === group.id && actionLoading.action === 'activate'}
+        >
+          {t('groups.actions.activate')}
+        </Button>
+      );
+    }
+
+    if (group.status === 'active') {
+      actions.push(
+        <Button
+          key={`${group.id}-suspend`}
+          variant="secondary"
+          size="slim"
+          onClick={() => handleStatusAction(group.id, 'suspend')}
+          loading={actionLoading.id === group.id && actionLoading.action === 'suspend'}
+        >
+          {t('groups.actions.suspend')}
+        </Button>
+      );
+    }
+
+    if (group.status !== 'terminated') {
+      actions.push(
+        <Button
+          key={`${group.id}-terminate`}
+          tone="critical"
+          variant="secondary"
+          size="slim"
+          onClick={() => handleStatusAction(group.id, 'terminate')}
+          loading={actionLoading.id === group.id && actionLoading.action === 'terminate'}
+        >
+          {t('groups.actions.terminate')}
+        </Button>
+      );
+    }
+
+    actions.push(
+      <Button
+        key={`${group.id}-sync`}
+        variant="secondary"
+        size="slim"
+        onClick={() => handleSyncMembers(group.id)}
+        loading={actionLoading.id === group.id && actionLoading.action === 'sync'}
+      >
+        {t('groups.actions.sync')}
+      </Button>
+    );
+
+    actions.push(
+      <Button
+        key={`${group.id}-view`}
+        onClick={() => router.push(`/admin/groups/${group.id}`)}
+      >
+        {t('groups.actions.view')}
+      </Button>
+    );
+
+    return [
+      group.name,
+      group.owner_email,
+      `${group.current_members}/${group.max_members}`,
+      getStatusBadge(group.status),
+      group.invite_code,
+      new Date(group.created_at).toLocaleDateString(),
+      <InlineStack gap="200" key={`${group.id}-actions`}>{actions}</InlineStack>,
+    ];
+  });
 
   if (loading) {
     return (
@@ -252,76 +400,101 @@ export default function GroupsPage() {
       }}
       secondaryActions={[
         {
-          content: t('groups.export'),
+          content: t('groups.exportJson'),
           onAction: () => handleExport('json'),
+          loading: exporting,
+        },
+        {
+          content: t('groups.exportCsv'),
+          onAction: () => handleExport('csv'),
           loading: exporting,
         },
         {
           content: t('groups.import'),
           onAction: () => setShowImportModal(true),
         },
+        {
+          content: <LanguageSelector />,
+        } as any,
       ]}
     >
       <Layout>
+        {feedback && (
+          <Layout.Section>
+            <Banner tone={feedback.tone} onDismiss={() => setFeedback(null)}>
+              {feedback.message}
+            </Banner>
+          </Layout.Section>
+        )}
+
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
               <InlineStack gap="400" align="space-between">
                 <TextField
-                  label=""
+                  label={t('groups.searchLabel')}
                   labelHidden
-                  placeholder="Search groups..."
+                  placeholder={t('groups.searchPlaceholder')}
                   value={searchQuery}
                   onChange={setSearchQuery}
                   autoComplete="off"
                 />
                 <Select
-                  label=""
+                  label={t('groups.statusFilter.label')}
                   labelHidden
                   options={[
-                    { label: 'All Status', value: 'all' },
-                    { label: 'Active', value: 'active' },
-                    { label: 'Suspended', value: 'suspended' },
-                    { label: 'Terminated', value: 'terminated' },
+                    { label: t('groups.statusFilter.all'), value: 'all' },
+                    { label: t('groups.status.active'), value: 'active' },
+                    { label: t('groups.status.suspended'), value: 'suspended' },
+                    { label: t('groups.status.terminated'), value: 'terminated' },
                   ]}
                   value={statusFilter}
                   onChange={setStatusFilter}
                 />
               </InlineStack>
 
-              {/* Export buttons */}
-              <InlineGrid columns={{ xs: 2, sm: 2 }} gap="300">
-                <Button
-                  variant="secondary"
-                  onClick={() => handleExport('json')}
-                  loading={exporting}
-                >
-                  Export JSON
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => handleExport('csv')}
-                  loading={exporting}
-                >
-                  Export CSV
-                </Button>
+              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
+                <TextField
+                  label={t('groups.memberFilters.min')}
+                  type="number"
+                  value={minMembers}
+                  onChange={setMinMembers}
+                  autoComplete="off"
+                  placeholder="0"
+                />
+                <TextField
+                  label={t('groups.memberFilters.max')}
+                  type="number"
+                  value={maxMembers}
+                  onChange={setMaxMembers}
+                  autoComplete="off"
+                  placeholder="20"
+                />
               </InlineGrid>
 
               {filteredGroups.length === 0 ? (
                 <EmptyState
-                  heading="No groups found"
+                  heading={t('groups.empty.heading')}
                   image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
                   action={{
-                    content: 'Refresh',
+                    content: t('groups.empty.action'),
                     onAction: loadGroups,
                   }}
                 >
-                  <Text as="p">No groups match your search criteria.</Text>
+                  <Text as="p">{t('groups.empty.description')}</Text>
                 </EmptyState>
               ) : (
                 <DataTable
                   columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                  headings={['Name', 'Owner', 'Members', 'Status', 'Invite Code', 'Created', 'Actions']}
+                  headings={[
+                    t('groups.table.name'),
+                    t('groups.table.owner'),
+                    t('groups.table.members'),
+                    t('groups.table.status'),
+                    t('groups.table.inviteCode'),
+                    t('groups.table.created'),
+                    t('groups.table.actions'),
+                  ]}
                   rows={rows}
                 />
               )}
@@ -330,7 +503,6 @@ export default function GroupsPage() {
         </Layout.Section>
       </Layout>
 
-      {/* Import Modal */}
       <Modal
         open={showImportModal}
         onClose={() => {
@@ -338,16 +510,16 @@ export default function GroupsPage() {
           setImportFile(null);
           setImportResult(null);
         }}
-        title="Import Groups and Members"
+        title={t('groups.importModal.title')}
         primaryAction={{
-          content: 'Import',
+          content: t('groups.importModal.primaryAction'),
           onAction: handleImportFile,
           loading: importing,
           disabled: !importFile,
         }}
         secondaryActions={[
           {
-            content: 'Cancel',
+            content: t('common.cancel'),
             onAction: () => {
               setShowImportModal(false);
               setImportFile(null);
@@ -359,19 +531,19 @@ export default function GroupsPage() {
         <Modal.Section>
           <BlockStack gap="400">
             <Text as="p" variant="bodyMd">
-              Import groups and members from a JSON or CSV file. The file should match the export format.
+              {t('groups.importModal.description')}
             </Text>
 
             <Select
-              label="Import Mode"
+              label={t('groups.importModal.modeLabel')}
               options={[
-                { label: 'Skip Existing (Recommended)', value: 'skip' },
-                { label: 'Update Existing', value: 'update' },
-                { label: 'Replace All', value: 'replace' },
+                { label: t('groups.importModal.modeSkip'), value: 'skip' },
+                { label: t('groups.importModal.modeUpdate'), value: 'update' },
+                { label: t('groups.importModal.modeReplace'), value: 'replace' },
               ]}
               value={importMode}
               onChange={setImportMode}
-              helpText="Skip: Don't import if group already exists. Update: Update existing groups. Replace: Delete and recreate."
+              helpText={t('groups.importModal.modeHelp')}
             />
 
             <input
@@ -387,21 +559,21 @@ export default function GroupsPage() {
             {importResult && (
               <Banner
                 tone={importResult.success ? 'success' : 'critical'}
-                title={importResult.success ? 'Import Successful' : 'Import Failed'}
+                title={importResult.success ? t('groups.importModal.resultSuccess') : t('groups.importModal.resultError')}
               >
                 {importResult.success ? (
                   <BlockStack gap="200">
                     <Text as="p">
-                      Created: {importResult.summary?.created || 0} | Updated: {importResult.summary?.updated || 0} | Skipped: {importResult.summary?.skipped || 0}
+                      {`${t('groups.importModal.createdLabel')}: ${importResult.summary?.created || 0} | ${t('groups.importModal.updatedLabel')}: ${importResult.summary?.updated || 0} | ${t('groups.importModal.skippedLabel')}: ${importResult.summary?.skipped || 0}`}
                     </Text>
                     {importResult.summary?.errors > 0 && (
                       <Text as="p" tone="subdued">
-                        Errors: {importResult.summary.errors}
+                        {`${t('groups.importModal.errorsLabel')}: ${importResult.summary.errors}`}
                       </Text>
                     )}
                   </BlockStack>
                 ) : (
-                  <Text as="p">{importResult.error || 'Unknown error occurred'}</Text>
+                  <Text as="p">{importResult.error}</Text>
                 )}
               </Banner>
             )}

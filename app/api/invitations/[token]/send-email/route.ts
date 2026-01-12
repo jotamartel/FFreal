@@ -36,11 +36,14 @@ export async function POST(
     const inviteLink = `${baseUrl}/customer/invitations/${params.token}`;
 
     // Send email
-    const emailSent = await sendInvitationEmail(
-      invitation.email,
-      group.name,
-      inviteLink
-    );
+    const emailSent = await sendInvitationEmail({
+      to: invitation.email,
+      groupName: group.name,
+      inviteLink,
+      inviteCode: group.invite_code,
+      merchantId: group.merchant_id,
+      language: 'es',
+    });
 
     if (!emailSent) {
       return NextResponse.json(

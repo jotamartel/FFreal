@@ -104,21 +104,12 @@ export async function POST(request: NextRequest) {
     const config = await getDiscountConfig(finalMerchantId);
     const finalMaxMembers = user.max_members_per_group ?? config?.max_members_default ?? 6;
     
-    // Get discount_tier: use user's discount_tier_identifier if set, otherwise default to 1
-    // If discount_tier_identifier is a number string, parse it; otherwise use as-is
-    let discountTier = 1;
-    if (user.discount_tier_identifier) {
-      const parsed = parseInt(user.discount_tier_identifier);
-      discountTier = isNaN(parsed) ? 1 : parsed;
-    }
-
     const group = await createGroup({
       merchantId: finalMerchantId,
       name,
       ownerCustomerId: user.shopify_customer_id || user.id,
       ownerEmail: user.email,
       maxMembers: finalMaxMembers,
-      discountTier,
       ownerUserId: user.id, // Vincular user_id
     });
 

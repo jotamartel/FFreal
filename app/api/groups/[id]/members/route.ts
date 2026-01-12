@@ -2,9 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  getGroupMembers, 
-  removeMemberFromGroup,
-  updateMember 
+  getGroupMembers,
+  updateMember
 } from '@/lib/database/ff-groups';
 
 /**
@@ -27,25 +26,18 @@ export async function GET(
 }
 
 /**
- * DELETE /api/groups/[id]/members/[memberId] - Remove a member from group
+ * PUT /api/groups/[id]/members - Update member status
  */
-export async function DELETE(
+export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const success = await removeMemberFromGroup(params.memberId);
-
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Failed to remove member' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true }, { status: 200 });
+    // The PUT handler for updating member status is moved to a nested route.
+    // This function will be removed or refactored in a subsequent edit.
+    return NextResponse.json({ message: 'PUT request for updating member status is not yet implemented.' }, { status: 501 });
   } catch (error) {
-    console.error('Error removing member:', error);
+    console.error('Error updating member status:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

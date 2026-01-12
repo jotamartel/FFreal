@@ -86,6 +86,10 @@ CREATE TABLE IF NOT EXISTS ff_discount_config (
   is_store_open BOOLEAN DEFAULT false,
   next_event_date TIMESTAMP WITH TIME ZONE,
   event_message TEXT,
+  terms_version VARCHAR(50),
+  terms_text TEXT,
+  email_from VARCHAR(255),
+  email_support VARCHAR(255),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

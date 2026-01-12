@@ -267,6 +267,54 @@ function FriendsFamilyBlock() {
     }
   }
 
+  async function handleRevokeInvitation(invitationId) {
+    if (!selectedGroup || !invitationId) {
+      console.warn('[ProfileBlock] Cannot revoke invitation: missing selectedGroup or invitationId');
+      return;
+    }
+
+    console.log('[ProfileBlock] Revoking invitation:', { invitationId, groupId: selectedGroup.id });
+    setRevokingInvitationId(invitationId);
+    setRevokeInvitationError(null);
+
+    try {
+      const sessionToken = await shopify.sessionToken.get();
+      console.log('[ProfileBlock] Session token obtained, length:', sessionToken?.length || 0);
+      
+      const url = `${APP_URL}/api/invitations/revoke?id=${invitationId}`;
+      console.log('[ProfileBlock] Calling DELETE:', url);
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        credentials: 'include',
+      });
+
+      console.log('[ProfileBlock] Response status:', response.status, response.statusText);
+      const data = await response.json();
+      console.log('[ProfileBlock] Response data:', data);
+
+      if (response.ok && data.success) {
+        console.log('[ProfileBlock] ✅ Invitation revoked successfully');
+        // Reload group details to refresh the pending invitations list
+        await fetchGroupDetails(selectedGroup.id);
+        setRevokeInvitationError(null);
+      } else {
+        const errorMsg = data.error || 'Error al eliminar la invitación';
+        console.error('[ProfileBlock] ❌ Error revoking invitation:', errorMsg);
+        setRevokeInvitationError(errorMsg);
+      }
+    } catch (err) {
+      console.error('[ProfileBlock] Exception revoking invitation:', err);
+      setRevokeInvitationError('Error al eliminar la invitación. Intenta de nuevo.');
+    } finally {
+      setRevokingInvitationId(null);
+    }
+  }
+
   async function handleInvite() {
     if (!inviteEmail.trim()) {
       setInviteError('Por favor ingresa un email válido');
