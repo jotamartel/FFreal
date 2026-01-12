@@ -81,7 +81,7 @@ npm run shopify:dev
 │   │   ├── checkout/     # Checkout integration
 │   │   ├── customer/     # Customer portal
 │   │   ├── admin/        # Admin panel
-│   │   └── appointments/ # Appointment booking
+│   │   └── ...
 │   ├── admin/            # Merchant admin pages
 │   └── customer/         # Customer portal pages
 ├── components/           # React components
@@ -133,13 +133,6 @@ npm run shopify:dev
 - `GET /api/admin/config` - Get discount config
 - `PUT /api/admin/config` - Update discount config
 - `GET /api/admin/analytics` - Get analytics
-
-### Appointments
-- `POST /api/appointments` - Create appointment
-- `GET /api/appointments` - List appointments
-- `GET /api/appointments/[id]` - Get appointment
-- `PATCH /api/appointments/[id]` - Update appointment
-- `DELETE /api/appointments/[id]` - Cancel appointment
 
 ## Next Steps
 

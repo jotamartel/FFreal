@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 // API routes for Friends & Family Invitations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createInvitation, getInvitationByToken, getGroupById } from '@/lib/database/ff-groups';
+import { createInvitation, getInvitationByToken, getGroupById, getDiscountConfig } from '@/lib/database/ff-groups';
 import { sendInvitationEmail } from '@/lib/email/service';
 
 /**
@@ -48,12 +48,15 @@ export async function POST(request: NextRequest) {
     try {
       if (group) {
         // Get redirect URL from config, or use default
-        const { getDiscountConfig } = await import('@/lib/database/ff-groups');
-        const config = await getDiscountConfig('default');
-        const baseUrl = config?.invite_redirect_url || process.env.NEXT_PUBLIC_APP_URL || 'https://shopify-friends-family-app.vercel.app';
-        
-        // Use invite_code instead of token - redirects to invitation page with code pre-filled
-        const inviteLink = `${baseUrl}/tienda/unirse?code=${group.invite_code}`;
+        const config = await getDiscountConfig(group.merchant_id);
+        const defaultRedirect = process.env.NEXT_PUBLIC_INVITE_REDIRECT_URL
+          || (process.env.SHOPIFY_STORE_DOMAIN ? `https://${process.env.SHOPIFY_STORE_DOMAIN}/apps/friends-family` : undefined)
+          || process.env.NEXT_PUBLIC_APP_URL
+          || 'https://shopify-friends-family-app.vercel.app';
+        const redirectBase = config?.invite_redirect_url || defaultRedirect;
+
+        const separator = redirectBase.includes('?') ? '&' : '?';
+        const inviteLink = `${redirectBase}${separator}code=${group.invite_code}`;
         
         console.log('[INVITATION] Sending invitation email:', {
           email,
@@ -63,12 +66,7 @@ export async function POST(request: NextRequest) {
           hasResendKey: !!process.env.RESEND_API_KEY,
         });
         
-        emailSent = await sendInvitationEmail(
-          email,
-          group.name,
-          inviteLink,
-          group.invite_code
-        );
+        emailSent = await sendInvitationEmail(email, group.name, inviteLink, group.invite_code);
 
         if (!emailSent) {
           emailError = 'Email service not configured or failed to send';
@@ -85,7 +83,8 @@ export async function POST(request: NextRequest) {
           errorMessage.includes('Domain not verified') || 
           errorMessage.includes('DOMAIN_NOT_VERIFIED') ||
           errorMessage.includes('modo de prueba')) {
-        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend. La invitación fue creada exitosamente. Puedes compartir el código de invitación manualmente: ' + (inviteCode || '');
+        emailError = 'El servicio de email está en modo de prueba. Para enviar invitaciones a otros usuarios, necesitas verificar un dominio en Resend.';
+        emailSent = false;
       } else {
         emailError = errorMessage;
       }
@@ -97,6 +96,7 @@ export async function POST(request: NextRequest) {
         invitation,
         emailSent,
         emailError: emailError || undefined,
+        inviteCode: emailSent ? undefined : inviteCode,
       },
       { status: 201 }
     );

@@ -1,25 +1,17 @@
 # Friends and Family Discount App
 
-A standalone Shopify app that enables merchants to offer Friends & Family discount programs with client-side group management, similar to YouTube Premium Family plans. Includes an integrated appointment booking system.
+A standalone Shopify app that enables merchants to offer Friends & Family access programs with client-side group management, similar a los planes familiares de suscripción.
 
 ## 🎯 Features
 
-### Friends & Family Discount System
+### Friends & Family Access System
 - ✅ Group creation and management
 - ✅ Member invitation system via email
-- ✅ Tiered discount structure (configurable by merchant)
-- ✅ Automatic discount application at checkout
-- ✅ Customer portal for group management
-- ✅ Merchant admin panel with analytics
+- ✅ Catálogo con precios ya descontados (mostrar precio tachado vs vigente)
+- ✅ Customer portal para gestionar tu grupo
+- ✅ Merchant admin panel con analytics
 - ✅ Email verification system
-- ✅ Fraud prevention (rate limiting, cooling periods)
-
-### Appointment Booking System
-- ✅ Multi-branch appointment scheduling
-- ✅ Availability slot management
-- ✅ Email notifications
-- ✅ Admin panel for appointment management
-- ✅ Integration with Shopify customer accounts
+- ✅ Controles anti abuso (cooling periods, límites por usuario)
 
 ## 🚀 Quick Start
 
@@ -86,7 +78,6 @@ shopify-friends-family-app/
 │   │   ├── checkout/           # Checkout integration
 │   │   ├── customer/           # Customer portal
 │   │   ├── admin/              # Admin panel
-│   │   ├── appointments/       # Appointment booking
 │   │   └── availability/       # Availability queries
 │   ├── admin/                  # Merchant admin pages (to be implemented)
 │   └── customer/               # Customer portal pages (to be implemented)
@@ -96,9 +87,7 @@ shopify-friends-family-app/
 │   │   ├── schema.sql          # Database schema
 │   │   ├── client.ts           # DB connection
 │   │   ├── ff-groups.ts        # F&F group functions
-│   │   ├── appointments.ts     # Appointment functions
-│   │   ├── branches.ts         # Branch functions
-│   │   └── availability.ts     # Availability functions
+│   │   └── ...                 # Helpers (grupos, usuarios, etc.)
 │   ├── shopify/                # Shopify integration
 │   └── email/                  # Email service
 ├── types/                      # TypeScript types
@@ -136,16 +125,6 @@ shopify-friends-family-app/
 - `PUT /api/admin/config` - Update discount config
 - `GET /api/admin/analytics?merchantId=...` - Get analytics
 
-### Appointments
-- `POST /api/appointments` - Create appointment
-- `GET /api/appointments` - List appointments
-- `GET /api/appointments/[id]` - Get appointment
-- `PATCH /api/appointments/[id]` - Update appointment
-- `DELETE /api/appointments/[id]` - Cancel appointment
-
-### Availability
-- `GET /api/availability?branchId=...&date=...` - Get available slots
-
 ## 🗄️ Database Schema
 
 The app uses PostgreSQL with the following main tables:
@@ -153,12 +132,9 @@ The app uses PostgreSQL with the following main tables:
 - **ff_groups**: Friends & Family groups
 - **ff_group_members**: Group membership
 - **ff_invitations**: Invitation system
-- **ff_discount_config**: Merchant discount configuration
-- **appointments**: Appointment bookings
-- **branches**: Store branches/locations
-- **availability_slots**: Available time slots
-
-See `lib/database/schema.sql` for the complete schema.
+- **ff_discount_config**: Merchant configuration (estado de tienda, redirecciones)
+- **users**: Empleados y responsables del programa
+- **terms_acceptance**: Historial de aceptación de términos
 
 ## 🔐 Security Features
 

@@ -8,11 +8,10 @@ export interface FFGroup {
   owner_email: string;
   owner_user_id?: string | null;
   invite_code: string;
-  discount_code?: string | null; // Shopify discount code
+  discount_code?: string | null;
   max_members: number;
   current_members: number;
   status: 'active' | 'suspended' | 'terminated';
-  discount_tier: number;
   created_at: string;
   updated_at: string;
 }
@@ -50,13 +49,14 @@ export interface FFDiscountConfig {
   id: string;
   merchant_id: string;
   is_enabled: boolean;
-  discount_type: 'percentage' | 'fixed';
-  tiers: DiscountTier[];
-  rules: DiscountRules;
+  invite_redirect_url?: string | null;
   max_groups_per_email: number;
   cooling_period_days: number;
   max_members_default?: number;
-  invite_redirect_url?: string;
+  rules: DiscountRules;
+  is_store_open: boolean;
+  next_event_date?: string | null;
+  event_message?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,8 +84,8 @@ export interface CreateGroupParams {
   name: string;
   ownerCustomerId: string;
   ownerEmail: string;
+  ownerUserId?: string;
   maxMembers?: number;
-  discountTier?: number;
 }
 
 export interface CreateInvitationParams {
@@ -110,12 +110,13 @@ export interface UpdateMemberParams {
 export interface UpdateDiscountConfigParams {
   merchantId: string;
   isEnabled?: boolean;
-  discountType?: 'percentage' | 'fixed';
-  tiers?: DiscountTier[];
+  inviteRedirectUrl?: string | null;
   rules?: DiscountRules;
   maxGroupsPerEmail?: number;
   coolingPeriodDays?: number;
   maxMembersDefault?: number;
-  inviteRedirectUrl?: string;
+  isStoreOpen?: boolean;
+  nextEventDate?: string | null;
+  eventMessage?: string | null;
 }
 

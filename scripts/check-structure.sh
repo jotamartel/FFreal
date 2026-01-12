@@ -35,9 +35,6 @@ echo "📁 Database:"
 check_exists "lib/database/schema.sql" || ((errors++))
 check_exists "lib/database/client.ts" || ((errors++))
 check_exists "lib/database/ff-groups.ts" || ((errors++))
-check_exists "lib/database/appointments.ts" || ((errors++))
-check_exists "lib/database/branches.ts" || ((errors++))
-check_exists "lib/database/availability.ts" || ((errors++))
 echo ""
 
 echo "📁 Admin Pages:"
@@ -47,8 +44,6 @@ check_exists "app/admin/groups/page.tsx" || ((errors++))
 check_exists "app/admin/groups/[id]/page.tsx" || ((errors++))
 check_exists "app/admin/config/page.tsx" || ((errors++))
 check_exists "app/admin/analytics/page.tsx" || ((errors++))
-check_exists "app/admin/appointments/page.tsx" || ((errors++))
-check_exists "app/admin/appointments/[id]/page.tsx" || ((errors++))
 echo ""
 
 echo "📁 Customer Pages:"
@@ -56,8 +51,6 @@ check_exists "app/customer/layout.tsx" || ((errors++))
 check_exists "app/customer/page.tsx" || ((errors++))
 check_exists "app/customer/groups/new/page.tsx" || ((errors++))
 check_exists "app/customer/groups/[id]/page.tsx" || ((errors++))
-check_exists "app/customer/appointments/page.tsx" || ((errors++))
-check_exists "app/customer/appointments/new/page.tsx" || ((errors++))
 check_exists "app/customer/invitations/[token]/page.tsx" || ((errors++))
 echo ""
 
@@ -73,9 +66,6 @@ echo ""
 
 echo "📁 Types:"
 check_exists "types/ff-groups.ts" || ((errors++))
-check_exists "types/appointments.ts" || ((errors++))
-check_exists "types/availability.ts" || ((errors++))
-check_exists "types/branch.ts" || ((errors++))
 echo ""
 
 echo "📁 Services:"

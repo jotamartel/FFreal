@@ -5,68 +5,69 @@ import { joinGroupByCode } from '@/lib/database/ff-groups';
 import { getSession } from '@/lib/auth/session';
 import { getUserById } from '@/lib/database/users';
 
-/**
- * POST /api/invitations/join-by-code - Join a group using invite code
- */
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+interface JoinByCodePayload {
+  inviteCode?: string;
+  customerEmail?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { inviteCode, email } = body;
+    const body = (await request.json()) as JoinByCodePayload;
+    const inviteCode = body.inviteCode?.trim().toUpperCase();
+    const providedEmail = body.customerEmail?.trim();
 
     if (!inviteCode) {
       return NextResponse.json(
-        { error: 'Código de invitación requerido' },
+        { error: 'inviteCode is required' },
         { status: 400 }
       );
     }
 
-    // Get user from session if authenticated
+    // session info (optional)
     const session = await getSession();
     let userId: string | undefined;
     let customerId: string | undefined;
-    let userEmail = email;
+    let resolvedEmail = providedEmail;
 
     if (session) {
-      const user = await getUserById(session.userId);
-      if (user) {
-        userId = user.id;
-        customerId = user.shopify_customer_id || user.id;
-        userEmail = user.email; // Use authenticated user's email
+      const sessionUser = await getUserById(session.userId);
+      if (sessionUser) {
+        userId = sessionUser.id;
+        customerId = sessionUser.shopify_customer_id || sessionUser.id;
+        resolvedEmail = sessionUser.email;
       }
     }
 
-    if (!userEmail) {
+    if (!resolvedEmail) {
       return NextResponse.json(
-        { error: 'Email requerido. Por favor inicia sesión o proporciona un email.' },
+        { error: 'customerEmail is required when user session is not available' },
         { status: 400 }
       );
     }
 
-    const member = await joinGroupByCode(
-      inviteCode.trim().toUpperCase(),
-      userEmail,
-      customerId,
-      userId
-    );
+    const member = await joinGroupByCode(inviteCode, resolvedEmail, customerId, userId);
 
     if (!member) {
       return NextResponse.json(
-        { error: 'No se pudo unir al grupo. Verifica que el código sea correcto, que el grupo no esté lleno, y que no seas ya miembro.' },
+        { error: 'Unable to join group. Verify the code, capacity, or membership status.' },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { 
+      {
+        success: true,
         member,
-        message: 'Te has unido al grupo exitosamente'
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error joining group by code:', error);
+    console.error('[POST /api/invitations/join-by-code] Error:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

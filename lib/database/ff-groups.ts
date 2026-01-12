@@ -12,8 +12,9 @@ import {
   UpdateMemberParams,
   UpdateDiscountConfigParams,
 } from '@/types/ff-groups';
-import { getOrCreateShopifyCustomer, createDiscountCode } from '@/lib/shopify/admin';
+import { getOrCreateShopifyCustomer } from '@/lib/shopify/admin';
 import { createUser, getUserByEmail, updateUser, findOrCreateUserByShopifyCustomerId } from './users';
+import { getUserById } from './users';
 import crypto from 'crypto';
 
 /**
@@ -34,27 +35,40 @@ function generateVerificationToken(): string {
  * Crear un nuevo grupo Friends & Family
  */
 export async function createGroup(
-  params: CreateGroupParams & { ownerUserId?: string }
+  params: CreateGroupParams
 ): Promise<FFGroup | null> {
   try {
-    const { merchantId, name, ownerCustomerId, ownerEmail, maxMembers = 6, discountTier = 1, ownerUserId } = params;
-    
-    // Verificar qué columnas existen
-    const groupsColumns = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'ff_groups' AND column_name IN ('owner_user_id')
-    `);
-    const hasOwnerUserId = groupsColumns.rows.length > 0;
-    
-    const membersColumns = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'ff_group_members' AND column_name IN ('user_id')
-    `);
-    const hasMemberUserId = membersColumns.rows.length > 0;
-    
-    // Generar código único
+    const { merchantId, name, ownerCustomerId, ownerEmail, ownerUserId } = params;
+
+    if (!ownerUserId) {
+      throw new Error('ownerUserId is required to create a group');
+    }
+
+    const ownerUser = await getUserById(ownerUserId);
+    if (!ownerUser) {
+      throw new Error('Owner user not found');
+    }
+
+    if (!ownerUser.is_active) {
+      throw new Error('Owner user is inactive');
+    }
+
+    if (!ownerUser.can_create_groups) {
+      throw new Error('User is not authorized to create groups');
+    }
+
+    const existingGroups = await pool.query(
+      `SELECT 1 FROM ff_groups WHERE owner_user_id = $1 AND status = 'active' LIMIT 1`,
+      [ownerUserId]
+    );
+
+    if (existingGroups.rows.length > 0) {
+      throw new Error('User already owns an active group');
+    }
+
+    const config = await getDiscountConfig(merchantId);
+    const finalMaxMembers = ownerUser.max_members_per_group ?? config?.max_members_default ?? 20;
+
     let inviteCode = generateInviteCode();
     let attempts = 0;
     while (attempts < 10) {
@@ -67,122 +81,49 @@ export async function createGroup(
       attempts++;
     }
 
-    // ===== CREAR CUPÓN DE DESCUENTO EN SHOPIFY =====
-    let discountCode: string | null = null;
-    
-    try {
-      // Get discount config first
-      const config = await getDiscountConfig(merchantId);
-      
-      // Calcular el descuento basado en el tier
-      const discountValue = await calculateDiscount(merchantId, 1, discountTier); // Start with 1 member (owner)
-      
-      if (discountValue > 0) {
-        // Get discount type from config
-        const discountType = config?.discount_type || 'percentage';
-        
-        // Generate discount code (similar format to invite code but different prefix)
-        const discountCodePrefix = 'FF';
-        let generatedDiscountCode = `${discountCodePrefix}${inviteCode.substring(0, 6)}`;
-        
-        // Ensure uniqueness
-        let discountCodeAttempts = 0;
-        while (discountCodeAttempts < 10) {
-          const existing = await pool.query(
-            'SELECT id FROM ff_groups WHERE discount_code = $1',
-            [generatedDiscountCode]
-          );
-          if (existing.rows.length === 0) break;
-          generatedDiscountCode = `${discountCodePrefix}${generateInviteCode().substring(0, 6)}`;
-          discountCodeAttempts++;
-        }
-        
-        console.log('[createGroup] Creating discount code in Shopify:', {
-          code: generatedDiscountCode,
-          value: discountValue,
-          type: discountType,
-          tier: discountTier,
-        });
-        
-        // Create discount code in Shopify
-        const { discountCode: shopifyDiscountCode, error: discountError } = await createDiscountCode({
-          code: generatedDiscountCode,
-          value: discountValue,
-          valueType: discountType === 'percentage' ? 'percentage' : 'fixed_amount',
-          title: `Friends & Family: ${name}`,
-          customerSelection: 'all', // Can be restricted to specific customers later
-        });
-        
-        if (discountError) {
-          console.warn('[createGroup] Failed to create discount code in Shopify (continuing anyway):', discountError);
-        } else if (shopifyDiscountCode) {
-          discountCode = shopifyDiscountCode.code;
-          console.log('[createGroup] ✅ Discount code created in Shopify:', discountCode);
-        }
-      } else {
-        console.log('[createGroup] No discount configured, skipping discount code creation');
-      }
-    } catch (error) {
-      console.error('[createGroup] Error creating discount code (continuing anyway):', error);
-      // Continue with group creation even if discount code fails
-    }
-
-    // Verificar si existe columna discount_code
-    const discountCodeColumn = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'ff_groups' AND column_name = 'discount_code'
-    `);
-    const hasDiscountCode = discountCodeColumn.rows.length > 0;
-
-    // Construir query INSERT dinámicamente basado en columnas disponibles
-    let insertColumns = ['merchant_id', 'name', 'owner_customer_id', 'owner_email', 'invite_code', 'max_members', 'current_members', 'discount_tier'];
-    let insertValues: any[] = [merchantId, name, ownerCustomerId, ownerEmail, inviteCode, maxMembers, 1, discountTier];
-    
-    if (hasOwnerUserId && ownerUserId) {
-      insertColumns.push('owner_user_id');
-      insertValues.push(ownerUserId);
-    }
-    
-    if (hasDiscountCode && discountCode) {
-      insertColumns.push('discount_code');
-      insertValues.push(discountCode);
-    }
-    
-    const placeholders = insertValues.map((_, i) => `$${i + 1}`).join(', ');
-    const columnsStr = insertColumns.join(', ');
-    
     const result = await pool.query(
-      `INSERT INTO ff_groups (${columnsStr})
-       VALUES (${placeholders})
-       RETURNING *`,
-      insertValues
+      `INSERT INTO ff_groups (
+        merchant_id,
+        name,
+        owner_customer_id,
+        owner_email,
+        owner_user_id,
+        invite_code,
+        max_members,
+        current_members,
+        status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1, 'active')
+      RETURNING *`,
+      [
+        merchantId,
+        name,
+        ownerCustomerId,
+        ownerEmail,
+        ownerUserId,
+        inviteCode,
+        finalMaxMembers,
+      ]
     );
 
     const group = result.rows[0] as FFGroup;
 
-    // Crear el owner como miembro activo
-    if (hasMemberUserId && ownerUserId) {
-      // Con user_id disponible
-      await pool.query(
-        `INSERT INTO ff_group_members 
-         (group_id, customer_id, user_id, email, role, status, email_verified, joined_at)
-         VALUES ($1, $2, $3, $4, 'owner', 'active', true, NOW())`,
-        [group.id, ownerCustomerId, ownerUserId, ownerEmail]
-      );
-    } else {
-      // Sin user_id (columna no existe o no disponible)
-      await pool.query(
-        `INSERT INTO ff_group_members 
-         (group_id, customer_id, email, role, status, email_verified, joined_at)
-         VALUES ($1, $2, $3, 'owner', 'active', true, NOW())`,
-        [group.id, ownerCustomerId, ownerEmail]
-      );
-    }
+    await pool.query(
+      `INSERT INTO ff_group_members (
+        group_id,
+        customer_id,
+        user_id,
+        email,
+        role,
+        status,
+        email_verified,
+        joined_at
+      ) VALUES ($1, $2, $3, $4, 'owner', 'active', true, NOW())`,
+      [group.id, ownerCustomerId, ownerUserId, ownerEmail]
+    );
 
     return group;
   } catch (error) {
-    console.error('Error creating group:', error);
+    console.error('[createGroup] Error creating group:', error);
     return null;
   }
 }

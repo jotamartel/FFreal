@@ -1,77 +1,90 @@
-// User database operations
+// User database operations (L'Oréal adaptation)
 
 import { pool } from './client';
 import { hashPassword, verifyPassword } from '../auth/password';
+import {
+  User,
+  CreateUserParams,
+  UpdateUserParams,
+} from '@/types/users';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string | null;
-  phone: string | null;
-  is_active: boolean;
-  role: string;
-  shopify_customer_id: string | null;
-  can_create_groups?: boolean;
-  max_members_per_group?: number | null;
-  discount_tier_identifier?: string | null;
-  created_at: Date;
-  updated_at: Date;
-  last_login_at: Date | null;
+const USER_COLUMNS = `
+  id,
+  email,
+  name,
+  phone,
+  role,
+  can_create_groups,
+  max_members_per_group,
+  discount_tier_identifier,
+  shopify_customer_id,
+  is_active,
+  created_at,
+  updated_at,
+  last_login_at
+`;
+
+function mapRowToUser(row: any): User {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    phone: row.phone,
+    role: row.role,
+    can_create_groups: row.can_create_groups ?? false,
+    max_members_per_group: row.max_members_per_group ?? null,
+    discount_tier_identifier: row.discount_tier_identifier ?? null,
+    shopify_customer_id: row.shopify_customer_id ?? null,
+    is_active: row.is_active ?? true,
+    created_at: row.created_at?.toISOString?.() ?? row.created_at,
+    updated_at: row.updated_at?.toISOString?.() ?? row.updated_at,
+    last_login_at: row.last_login_at ? (row.last_login_at?.toISOString?.() ?? row.last_login_at) : null,
+  };
 }
 
-export interface CreateUserParams {
-  email: string;
-  password: string;
-  name?: string;
-  phone?: string;
-  role?: string;
-  shopify_customer_id?: string;
-}
-
-export interface UpdateUserParams {
-  name?: string;
-  phone?: string;
-  is_active?: boolean;
-  can_create_groups?: boolean;
-  max_members_per_group?: number | null;
-  discount_tier_identifier?: string | null;
-}
-
-/**
- * Create a new user
- */
 export async function createUser(params: CreateUserParams): Promise<User | null> {
   try {
     const passwordHash = await hashPassword(params.password);
-    
+
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, name, phone, role, shopify_customer_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at`,
+      `INSERT INTO users (
+        email,
+        password_hash,
+        name,
+        phone,
+        role,
+        can_create_groups,
+        max_members_per_group,
+        discount_tier_identifier,
+        shopify_customer_id,
+        is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING ${USER_COLUMNS}`,
       [
         params.email,
         passwordHash,
-        params.name || null,
-        params.phone || null,
-        params.role || 'customer',
-        params.shopify_customer_id || null,
+        params.name ?? null,
+        params.phone ?? null,
+        params.role ?? 'customer',
+        params.canCreateGroups ?? false,
+        params.maxMembersPerGroup ?? null,
+        params.discountTierIdentifier ?? null,
+        params.shopifyCustomerId ?? null,
+        params.isActive ?? true,
       ]
     );
 
-    return result.rows[0] as User;
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('Error creating user:', error);
+    console.error('[createUser] Error creating user:', error);
     return null;
   }
 }
 
-/**
- * Get user by email
- */
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, password_hash, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at
+      `SELECT ${USER_COLUMNS}
        FROM users
        WHERE email = $1`,
       [email]
@@ -81,20 +94,17 @@ export async function getUserByEmail(email: string): Promise<User | null> {
       return null;
     }
 
-    return result.rows[0] as User;
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('Error getting user by email:', error);
+    console.error('[getUserByEmail] Error getting user by email:', error);
     return null;
   }
 }
 
-/**
- * Get user by ID
- */
 export async function getUserById(id: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at
+      `SELECT ${USER_COLUMNS}
        FROM users
        WHERE id = $1`,
       [id]
@@ -104,69 +114,52 @@ export async function getUserById(id: string): Promise<User | null> {
       return null;
     }
 
-    return result.rows[0] as User;
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('Error getting user by id:', error);
+    console.error('[getUserById] Error getting user by id:', error);
     return null;
   }
 }
 
-/**
- * Verify user credentials
- */
 export async function verifyUserCredentials(
   email: string,
   password: string
 ): Promise<User | null> {
   try {
-    // Primero buscar sin filtrar por is_active para ver qué pasa
-    const checkResult = await pool.query(
-      `SELECT id, email, password_hash, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at
+    const result = await pool.query(
+      `SELECT ${USER_COLUMNS}, password_hash
        FROM users
        WHERE email = $1`,
       [email]
     );
 
-    if (checkResult.rows.length === 0) {
-      console.error(`[verifyUserCredentials] Usuario no encontrado: ${email}`);
+    if (result.rows.length === 0) {
+      console.warn(`[verifyUserCredentials] User not found: ${email}`);
       return null;
     }
 
-    const user = checkResult.rows[0];
-    
-    if (!user.is_active) {
-      console.error(`[verifyUserCredentials] Usuario inactivo: ${email} (is_active = ${user.is_active})`);
+    const dbUser = result.rows[0];
+
+    if (!dbUser.is_active) {
+      console.warn(`[verifyUserCredentials] User inactive: ${email}`);
       return null;
     }
 
-    // Verificar contraseña
-    const isValid = await verifyPassword(password, user.password_hash);
-    
+    const isValid = await verifyPassword(password, dbUser.password_hash);
     if (!isValid) {
-      console.error(`[verifyUserCredentials] Contraseña incorrecta para: ${email}`);
+      console.warn(`[verifyUserCredentials] Invalid password for ${email}`);
       return null;
     }
 
-    console.log(`[verifyUserCredentials] ✅ Credenciales válidas para: ${email}`);
+    await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [dbUser.id]);
 
-    // Update last login
-    await pool.query(
-      `UPDATE users SET last_login_at = NOW() WHERE id = $1`,
-      [user.id]
-    );
-
-    // Remove password_hash from returned user
-    const { password_hash, ...userWithoutPassword } = user;
-    return userWithoutPassword as User;
+    return mapRowToUser({ ...dbUser, last_login_at: new Date() });
   } catch (error) {
-    console.error('[verifyUserCredentials] Error verificando credenciales:', error);
+    console.error('[verifyUserCredentials] Error verifying credentials:', error);
     return null;
   }
 }
 
-/**
- * Update user
- */
 export async function updateUser(
   id: string,
   params: UpdateUserParams
@@ -184,21 +177,33 @@ export async function updateUser(
       updates.push(`phone = $${paramCount++}`);
       values.push(params.phone);
     }
-    if (params.is_active !== undefined) {
-      updates.push(`is_active = $${paramCount++}`);
-      values.push(params.is_active);
+    if (params.role !== undefined) {
+      updates.push(`role = $${paramCount++}`);
+      values.push(params.role);
     }
-    if (params.can_create_groups !== undefined) {
+    if (params.canCreateGroups !== undefined) {
       updates.push(`can_create_groups = $${paramCount++}`);
-      values.push(params.can_create_groups);
+      values.push(params.canCreateGroups);
     }
-    if (params.max_members_per_group !== undefined) {
+    if (params.maxMembersPerGroup !== undefined) {
       updates.push(`max_members_per_group = $${paramCount++}`);
-      values.push(params.max_members_per_group);
+      values.push(params.maxMembersPerGroup);
     }
-    if (params.discount_tier_identifier !== undefined) {
+    if (params.discountTierIdentifier !== undefined) {
       updates.push(`discount_tier_identifier = $${paramCount++}`);
-      values.push(params.discount_tier_identifier);
+      values.push(params.discountTierIdentifier);
+    }
+    if (params.shopifyCustomerId !== undefined) {
+      updates.push(`shopify_customer_id = $${paramCount++}`);
+      values.push(params.shopifyCustomerId);
+    }
+    if (params.isActive !== undefined) {
+      updates.push(`is_active = $${paramCount++}`);
+      values.push(params.isActive);
+    }
+    if (params.lastLoginAt !== undefined) {
+      updates.push(`last_login_at = $${paramCount++}`);
+      values.push(params.lastLoginAt);
     }
 
     if (updates.length === 0) {
@@ -211,24 +216,25 @@ export async function updateUser(
       `UPDATE users
        SET ${updates.join(', ')}, updated_at = NOW()
        WHERE id = $${paramCount}
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at`,
+       RETURNING ${USER_COLUMNS}`,
       values
     );
 
-    return result.rows[0] as User;
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('Error updating user:', error);
+    console.error('[updateUser] Error updating user:', error);
     return null;
   }
 }
 
-/**
- * Get user by Shopify customer ID
- */
 export async function getUserByShopifyCustomerId(shopifyCustomerId: string): Promise<User | null> {
   try {
     const result = await pool.query(
-      `SELECT id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at
+      `SELECT ${USER_COLUMNS}
        FROM users
        WHERE shopify_customer_id = $1`,
       [shopifyCustomerId]
@@ -238,83 +244,65 @@ export async function getUserByShopifyCustomerId(shopifyCustomerId: string): Pro
       return null;
     }
 
-    return result.rows[0] as User;
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('Error getting user by Shopify customer ID:', error);
+    console.error('[getUserByShopifyCustomerId] Error getting user by Shopify customer ID:', error);
     return null;
   }
 }
 
-/**
- * Find or create user by Shopify customer ID
- * This is useful for Customer Account Extensions where we only have the Shopify customer ID
- * If the user doesn't exist, creates a basic user account linked to the Shopify customer ID
- */
 export async function findOrCreateUserByShopifyCustomerId(
   shopifyCustomerId: string,
   email?: string
 ): Promise<User | null> {
   try {
-    // First, try to find existing user
     let user = await getUserByShopifyCustomerId(shopifyCustomerId);
-    
     if (user) {
-      console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Found existing user for Shopify customer ID: ${shopifyCustomerId}`);
       return user;
     }
 
-    // If not found and we have email, try to find by email and link the Shopify customer ID
     if (email) {
       const userByEmail = await getUserByEmail(email);
       if (userByEmail) {
-        // Update the user with Shopify customer ID
         await pool.query(
           `UPDATE users SET shopify_customer_id = $1, updated_at = NOW() WHERE id = $2`,
           [shopifyCustomerId, userByEmail.id]
         );
-        console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Linked existing user by email to Shopify customer ID: ${shopifyCustomerId}`);
         return { ...userByEmail, shopify_customer_id: shopifyCustomerId };
       }
     }
 
-    // If still not found, create a basic user account for this Shopify customer
-    // This allows Customer Account Extensions to work without requiring full registration
-    // The user can complete registration later if needed
-    console.log(`[findOrCreateUserByShopifyCustomerId] Creating new user for Shopify customer ID: ${shopifyCustomerId}`);
-    
-    // Generate a temporary email if none provided
     const tempEmail = email || `shopify_customer_${shopifyCustomerId}@temp.local`;
-    
-    // Generate a random password (user won't be able to login with this until they register properly)
     const tempPassword = `temp_${shopifyCustomerId}_${Date.now()}`;
     const passwordHash = await hashPassword(tempPassword);
-    
+
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, name, role, shopify_customer_id, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, name, phone, is_active, role, shopify_customer_id, can_create_groups, max_members_per_group, discount_tier_identifier, created_at, updated_at, last_login_at`,
+      `INSERT INTO users (
+        email,
+        password_hash,
+        name,
+        role,
+        shopify_customer_id,
+        is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING ${USER_COLUMNS}`,
       [
         tempEmail,
         passwordHash,
         `Shopify Customer ${shopifyCustomerId}`,
         'customer',
         shopifyCustomerId,
-        true, // Active by default
+        true,
       ]
     );
 
-    const newUser = result.rows[0] as User;
-    console.log(`[findOrCreateUserByShopifyCustomerId] ✅ Created new user for Shopify customer ID: ${shopifyCustomerId}, userId: ${newUser.id}`);
-    return newUser;
+    return mapRowToUser(result.rows[0]);
   } catch (error) {
-    console.error('[findOrCreateUserByShopifyCustomerId] Error finding or creating user by Shopify customer ID:', error);
+    console.error('[findOrCreateUserByShopifyCustomerId] Error handling Shopify customer ID:', error);
     return null;
   }
 }
 
-/**
- * Check if email exists
- */
 export async function emailExists(email: string): Promise<boolean> {
   try {
     const result = await pool.query(
@@ -323,7 +311,7 @@ export async function emailExists(email: string): Promise<boolean> {
     );
     return result.rows.length > 0;
   } catch (error) {
-    console.error('Error checking email existence:', error);
+    console.error('[emailExists] Error checking email existence:', error);
     return false;
   }
 }
