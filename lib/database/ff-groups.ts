@@ -38,7 +38,7 @@ export async function createGroup(
   params: CreateGroupParams
 ): Promise<FFGroup | null> {
   try {
-    const { merchantId, name, ownerCustomerId, ownerEmail, ownerUserId } = params;
+    const { merchantId, name, ownerCustomerId, ownerEmail, ownerUserId, maxMembers } = params;
 
     if (!ownerUserId) {
       throw new Error('ownerUserId is required to create a group');
@@ -67,7 +67,8 @@ export async function createGroup(
     }
 
     const config = await getDiscountConfig(merchantId);
-    const finalMaxMembers = ownerUser.max_members_per_group ?? config?.max_members_default ?? 20;
+    const finalMaxMembers =
+      maxMembers ?? ownerUser.max_members_per_group ?? config?.max_members_default ?? 20;
 
     let inviteCode = generateInviteCode();
     let attempts = 0;
@@ -137,7 +138,32 @@ export async function getGroupById(id: string): Promise<FFGroup | null> {
       'SELECT * FROM ff_groups WHERE id = $1',
       [id]
     );
-    return result.rows[0] as FFGroup || null;
+    const group = (result.rows[0] as FFGroup) || null;
+
+    if (!group) {
+      return null;
+    }
+
+    try {
+      let targetMax = group.max_members;
+      if (group.owner_user_id) {
+        const ownerUser = await getUserById(group.owner_user_id);
+        const config = await getDiscountConfig(group.merchant_id);
+        targetMax = ownerUser?.max_members_per_group ?? config?.max_members_default ?? 20;
+      }
+
+      if (targetMax && targetMax !== group.max_members) {
+        const updateResult = await pool.query(
+          `UPDATE ff_groups SET max_members = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+          [targetMax, id]
+        );
+        return (updateResult.rows[0] as FFGroup) || group;
+      }
+    } catch (syncError) {
+      console.warn('[getGroupById] Failed to sync max_members, returning existing value', syncError);
+    }
+
+    return group;
   } catch (error) {
     console.error('Error getting group by id:', error);
     return null;
@@ -461,7 +487,22 @@ export async function removeMemberFromGroup(
   memberId: string
 ): Promise<boolean> {
   try {
+    const member = await getMemberById(memberId);
+
+    if (!member) {
+      console.warn('[removeMemberFromGroup] Member not found:', memberId);
+      return false;
+    }
+
+    if (member.role === 'owner') {
+      console.warn('[removeMemberFromGroup] Attempt to remove owner blocked:', memberId);
+      return false;
+    }
+
     await updateMember({ id: memberId, status: 'removed' });
+    if (member.group_id) {
+      await syncGroupMemberCount(member.group_id);
+    }
     return true;
   } catch (error) {
     console.error('Error removing member from group:', error);
@@ -527,6 +568,46 @@ export async function getInvitationByToken(token: string): Promise<FFInvitation 
   } catch (error) {
     console.error('Error getting invitation by token:', error);
     return null;
+  }
+}
+
+/**
+ * Obtener invitaciones pendientes de un grupo
+ */
+export async function getPendingInvitationsByGroupId(groupId: string): Promise<FFInvitation[]> {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM ff_invitations 
+       WHERE group_id = $1 
+       AND status = 'pending' 
+       AND expires_at > NOW()
+       ORDER BY created_at DESC`,
+      [groupId]
+    );
+    return result.rows as FFInvitation[];
+  } catch (error) {
+    console.error('Error getting pending invitations by group ID:', error);
+    return [];
+  }
+}
+
+/**
+ * Revocar/Eliminar una invitación pendiente
+ */
+export async function revokeInvitation(invitationId: string): Promise<boolean> {
+  try {
+    const result = await pool.query(
+      `UPDATE ff_invitations 
+       SET status = 'revoked' 
+       WHERE id = $1 AND status = 'pending'
+       RETURNING *`,
+      [invitationId]
+    );
+    
+    return result.rows.length > 0;
+  } catch (error) {
+    console.error('Error revoking invitation:', error);
+    return false;
   }
 }
 
@@ -612,7 +693,7 @@ export async function acceptInvitation(
           email: invitation.email,
           password: tempPassword,
           role: 'customer',
-          shopify_customer_id: finalShopifyCustomerId,
+          shopifyCustomerId: finalShopifyCustomerId,
         });
         
         if (appUser) {
@@ -748,7 +829,7 @@ export async function joinGroupByCode(
           email: email,
           password: tempPassword,
           role: 'customer',
-          shopify_customer_id: finalShopifyCustomerId,
+          shopifyCustomerId: finalShopifyCustomerId,
         });
         
         if (appUser) {
@@ -858,11 +939,14 @@ export async function upsertDiscountConfig(
     const {
       merchantId,
       isEnabled,
-      discountType,
-      tiers,
       rules,
       maxGroupsPerEmail,
       coolingPeriodDays,
+      maxMembersDefault,
+      inviteRedirectUrl,
+      isStoreOpen,
+      nextEventDate,
+      eventMessage,
     } = params;
 
     const existing = await getDiscountConfig(merchantId);
@@ -877,14 +961,6 @@ export async function upsertDiscountConfig(
         updates.push(`is_enabled = $${paramCount++}`);
         values.push(isEnabled);
       }
-      if (discountType) {
-        updates.push(`discount_type = $${paramCount++}`);
-        values.push(discountType);
-      }
-      if (tiers) {
-        updates.push(`tiers = $${paramCount++}::jsonb`);
-        values.push(JSON.stringify(tiers));
-      }
       if (rules) {
         updates.push(`rules = $${paramCount++}::jsonb`);
         values.push(JSON.stringify(rules));
@@ -897,13 +973,25 @@ export async function upsertDiscountConfig(
         updates.push(`cooling_period_days = $${paramCount++}`);
         values.push(coolingPeriodDays);
       }
-      if (params.maxMembersDefault !== undefined) {
+      if (maxMembersDefault !== undefined) {
         updates.push(`max_members_default = $${paramCount++}`);
-        values.push(params.maxMembersDefault);
+        values.push(maxMembersDefault);
       }
-      if (params.inviteRedirectUrl !== undefined) {
+      if (inviteRedirectUrl !== undefined) {
         updates.push(`invite_redirect_url = $${paramCount++}`);
-        values.push(params.inviteRedirectUrl);
+        values.push(inviteRedirectUrl);
+      }
+      if (isStoreOpen !== undefined) {
+        updates.push(`is_store_open = $${paramCount++}`);
+        values.push(isStoreOpen);
+      }
+      if (nextEventDate !== undefined) {
+        updates.push(`next_event_date = $${paramCount++}`);
+        values.push(nextEventDate);
+      }
+      if (eventMessage !== undefined) {
+        updates.push(`event_message = $${paramCount++}`);
+        values.push(eventMessage);
       }
 
       if (updates.length === 0) {
@@ -922,19 +1010,20 @@ export async function upsertDiscountConfig(
       // Create
       const result = await pool.query(
         `INSERT INTO ff_discount_config 
-         (merchant_id, is_enabled, discount_type, tiers, rules, max_groups_per_email, cooling_period_days, max_members_default, invite_redirect_url)
-         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
+         (merchant_id, is_enabled, rules, max_groups_per_email, cooling_period_days, max_members_default, invite_redirect_url, is_store_open, next_event_date, event_message)
+         VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           merchantId,
           isEnabled ?? true,
-          discountType ?? 'percentage',
-          JSON.stringify(tiers || []),
           JSON.stringify(rules || {}),
           maxGroupsPerEmail ?? 1,
           coolingPeriodDays ?? 30,
-          params.maxMembersDefault ?? 6,
-          params.inviteRedirectUrl || null,
+          maxMembersDefault ?? 20,
+          inviteRedirectUrl || null,
+          isStoreOpen ?? false,
+          nextEventDate || null,
+          eventMessage || null,
         ]
       );
 
@@ -954,45 +1043,10 @@ export async function calculateDiscount(
   memberCount: number,
   discountTier?: number | string
 ): Promise<number> {
-  try {
-    const config = await getDiscountConfig(merchantId);
-    
-    if (!config || !config.is_enabled) {
-      return 0;
-    }
-
-    const tiers = config.tiers || [];
-    if (tiers.length === 0) {
-      return 0;
-    }
-
-    // First, try to find by tierIdentifier (if discountTier is provided)
-    if (discountTier !== undefined) {
-      const tierIdentifier = typeof discountTier === 'string' ? discountTier : discountTier.toString();
-      const tierByIdentifier = tiers.find(t => t.tierIdentifier === tierIdentifier);
-      if (tierByIdentifier) {
-        return tierByIdentifier.discountValue;
-      }
-    }
-
-    // Fallback: find by memberCount (only tiers with memberCount defined)
-    const tiersByMemberCount = tiers.filter(t => t.memberCount !== undefined);
-    if (tiersByMemberCount.length > 0) {
-      // Ordenar tiers por memberCount descendente
-      const sortedTiers = [...tiersByMemberCount].sort((a, b) => (b.memberCount || 0) - (a.memberCount || 0));
-      
-      // Encontrar el tier apropiado
-      for (const tier of sortedTiers) {
-        if (tier.memberCount && memberCount >= tier.memberCount) {
-          return tier.discountValue;
-        }
-      }
-    }
-
-    return 0;
-  } catch (error) {
-    console.error('Error calculating discount:', error);
-    return 0;
-  }
+  // El sistema de L'Oréal no calcula descuentos dinámicos.
+  // Los precios ya incluyen el descuento Friends & Family.
+  // Mantener la firma para compatibilidad con puntos de integración existentes.
+  console.warn('[calculateDiscount] Discount calculation is disabled for this project. Returning 0.');
+  return 0;
 }
 

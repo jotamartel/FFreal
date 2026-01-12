@@ -1,7 +1,7 @@
 // API routes for individual Friends & Family Group
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getGroupById, updateGroup, getGroupMembers, syncGroupMemberCount } from '@/lib/database/ff-groups';
+import { getGroupById, updateGroup, getGroupMembers, syncGroupMemberCount, getPendingInvitationsByGroupId } from '@/lib/database/ff-groups';
 
 /**
  * GET /api/groups/[id] - Get group details
@@ -29,11 +29,33 @@ export async function GET(
     // Get members (include all statuses for admin view)
     const allMembers = await getGroupMembers(params.id, true);
     const activeMembers = allMembers.filter(m => m.status === 'active');
+    
+    // Get pending invitations
+    const pendingInvitations = await getPendingInvitationsByGroupId(params.id);
+    
+    console.log('[GET /api/groups/[id]] Group details:', {
+      groupId: params.id,
+      membersCount: activeMembers.length,
+      members: activeMembers.map((m: any) => ({
+        id: m.id,
+        email: m.email,
+        status: m.status,
+        role: m.role,
+      })),
+      pendingInvitationsCount: pendingInvitations.length,
+      pendingInvitations: pendingInvitations.map((inv: any) => ({
+        id: inv.id,
+        email: inv.email,
+        status: inv.status,
+        expires_at: inv.expires_at,
+      })),
+    });
 
     return NextResponse.json({ 
       group: updatedGroup || group,
       members: activeMembers, // Show only active members by default
       allMembers: allMembers, // Include all for reference
+      pendingInvitations: pendingInvitations, // Invitations that haven't been accepted yet
       memberCountBreakdown: {
         total: allMembers.length,
         active: activeMembers.length,
