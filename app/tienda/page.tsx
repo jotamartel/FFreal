@@ -33,8 +33,14 @@ export default function TiendaPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [user, setUser] = useState<any>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [isInIframe, setIsInIframe] = useState(false);
 
   useEffect(() => {
+    // Detect if we're in an iframe (App Block)
+    if (typeof window !== 'undefined') {
+      setIsInIframe(window.self !== window.top);
+    }
+    
     // Removed store status check - Friends & Family app should always be available
     checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -42,6 +48,12 @@ export default function TiendaPage() {
 
   const checkAuth = async () => {
     try {
+      // If in iframe (App Block), show message to use Customer Account
+      if (typeof window !== 'undefined' && window.self !== window.top) {
+        setLoading(false);
+        return;
+      }
+      
       const response = await fetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
@@ -111,6 +123,35 @@ export default function TiendaPage() {
         <Card>
           <Text as="p">Cargando...</Text>
         </Card>
+      </Page>
+    );
+  }
+
+  // If loaded in iframe (App Block), show message to use Customer Account
+  if (isInIframe) {
+    return (
+      <Page title="Friends & Family">
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h1" variant="headingLg">
+                  Friends & Family
+                </Text>
+                <Banner tone="info">
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodyMd">
+                      Para gestionar tus grupos Friends & Family, accede desde tu cuenta de cliente.
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Ve a <strong>Mi Cuenta</strong> → <strong>Perfil</strong> para ver y gestionar tus grupos.
+                    </Text>
+                  </BlockStack>
+                </Banner>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
       </Page>
     );
   }
