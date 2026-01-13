@@ -13,6 +13,8 @@ import { getSession } from '@/lib/auth/session';
 import { getUserById, findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
 import { validateShopifySessionToken, extractCustomerIdFromToken } from '@/lib/auth/shopify-session';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/groups - Create a new group (requires authentication)
  */

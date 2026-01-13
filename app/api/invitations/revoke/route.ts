@@ -8,6 +8,7 @@ import { findOrCreateUserByShopifyCustomerId } from '@/lib/database/users';
 import { pool } from '@/lib/database/client';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * DELETE /api/invitations/revoke?id=... - Revoke/delete a pending invitation
